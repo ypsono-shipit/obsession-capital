@@ -4,6 +4,7 @@ import LandingPage from './components/LandingPage.tsx';
 import DemoApp from './demo/DemoApp.tsx';
 import Win3App from './win3/Win3App.tsx';
 import ResourceApp from './win3/ResourceApp.tsx';
+import ResourceGuide from './win3/ResourceGuide.tsx';
 import './index.css';
 
 const path = window.location.pathname;
@@ -13,6 +14,7 @@ const Root = () => {
   if (path === '/fnb') return <DemoApp />;
   if (path === '/win') return <Win3App />;
   if (path === '/resource') return <ResourceApp />;
+  if (path === '/resource/compounding-second-brain') return <ResourceGuide />;
   return <LandingPage />;
 };
 

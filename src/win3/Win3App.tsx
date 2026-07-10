@@ -453,6 +453,12 @@ export default function Win3App() {
               {t.label}
             </button>
           ))}
+          <a
+            href="/resource"
+            className="px-4 py-1.5 text-[10px] uppercase tracking-widest font-bold transition text-[#666] hover:text-white"
+          >
+            Resource
+          </a>
         </div>
 
         <div className="flex items-center gap-4">

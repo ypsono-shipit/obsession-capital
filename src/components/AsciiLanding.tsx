@@ -111,7 +111,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
       <div className="max-w-4xl mx-auto w-full flex justify-between items-center text-[10px] text-neutral-600 border-b border-neutral-900 pb-3 mb-6 select-none">
         <div>SYS_GATEWAY: //PORTAL_3000</div>
         <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse"></span>
           <span>GATEWAY STATUS: READY_FOR_ACTIVATION</span>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
         
         {/* ASCII Header Frame */}
         <div className="text-center overflow-x-auto select-none no-scrollbar py-2">
-          <pre className="text-emerald-500 font-mono text-[10px] md:text-xs leading-none inline-block text-left whitespace-pre">
+          <pre className="text-white font-mono text-[10px] md:text-xs leading-none inline-block text-left whitespace-pre">
 {`   ____  ____   ____  _____ ____ ____ ___ ___  _   _    ___  ____  
   / __ \\|  _ \\ / ___|| ____/ ___/ ___|_ _/ _ \\| \\ | |  / _ \\/ ___| 
  | |  | | |_) |\\___ \\|  _| \\___ \\___ \\ | | | | |  \\| | | | | \\___ \\ 
@@ -135,35 +135,35 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
 
         {isBooting ? (
           /* BOOT SEQUENCE CONSOLE WRAPPER */
-          <div className="border border-emerald-500/40 bg-[#090909] p-6 shadow-lg shadow-emerald-950/20 max-w-xl mx-auto w-full animate-pulse">
-            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3 mb-4">
-              <span className="text-emerald-400 font-bold text-xs flex items-center gap-2">
-                <Terminal className="w-4 h-4 animate-spin text-emerald-400" />
+          <div className="border border-white/40 bg-[#090909] p-6 shadow-lg shadow-white/5 max-w-xl mx-auto w-full animate-pulse">
+            <div className="flex items-center justify-between border-b border-white/20 pb-3 mb-4">
+              <span className="text-white font-bold text-xs flex items-center gap-2">
+                <Terminal className="w-4 h-4 animate-spin text-white" />
                 CONSOLE BOOT SEQUENCE ACTIVE
               </span>
-              <span className="text-[10px] text-emerald-500/60 font-mono">
+              <span className="text-[10px] text-white/60 font-mono">
                 {Math.round((currentLogIdx / BOOT_STEPS.length) * 100)}% COMPLETE
               </span>
             </div>
 
             {/* Scrolling Logs Panel */}
-            <div className="space-y-2 h-64 overflow-y-auto font-mono text-[10px] text-emerald-400 leading-relaxed scrollbar-none pr-2">
+            <div className="space-y-2 h-64 overflow-y-auto font-mono text-[10px] text-white leading-relaxed scrollbar-none pr-2">
               {bootLogs.map((log, index) => (
                 <div key={index} className="flex items-start gap-1">
-                  <span className="text-emerald-600 font-bold select-none">&gt;</span>
+                  <span className="text-white/50 font-bold select-none">&gt;</span>
                   <span className="whitespace-pre-wrap">{log}</span>
                 </div>
               ))}
               <div className="flex items-center gap-1 mt-1 text-white">
-                <span className="text-emerald-500 font-bold select-none">&gt;</span>
-                <span className="bg-emerald-500/30 text-white px-1.5 py-0.5 animate-pulse rounded-xs uppercase tracking-wider text-[9px] font-bold">
+                <span className="text-white font-bold select-none">&gt;</span>
+                <span className="bg-white/20 text-white px-1.5 py-0.5 animate-pulse rounded-xs uppercase tracking-wider text-[9px] font-bold">
                   {currentLogIdx < BOOT_STEPS.length ? "BOOTING_UP..." : "LOADING SCOREBOARD_OS..."}
                 </span>
-                <span className="w-1.5 h-3 bg-emerald-500 caret-blink inline-block"></span>
+                <span className="w-1.5 h-3 bg-white caret-blink inline-block"></span>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-emerald-500/20 flex justify-between text-[9px] text-emerald-600 select-none uppercase">
+            <div className="mt-4 pt-3 border-t border-white/20 flex justify-between text-[9px] text-white/50 select-none uppercase">
               <span>SECURE_IP: ENCRYPTED_AES256</span>
               <span>NODE: SH-X92-HQ</span>
             </div>
@@ -174,7 +174,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
             
             {/* COLUMN 1: INTERACTIVE ACTIVATION FORM */}
             <div className="md:col-span-6 relative border border-neutral-800 bg-[#0a0a0a] p-6 shadow-md">
-              <div className="absolute top-[-10px] left-[15px] bg-[#050505] px-2 text-[10px] text-emerald-400 tracking-wider uppercase font-bold">
+              <div className="absolute top-[-10px] left-[15px] bg-[#050505] px-2 text-[10px] text-white tracking-wider uppercase font-bold">
                 SYSTEM REGISTER & LOGIN
               </div>
               
@@ -199,7 +199,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. Neo, Jane Doe, Root Operator"
-                      className="w-full bg-[#0d0d0d] border border-neutral-800 p-2.5 pl-3 text-white font-mono focus:outline-none focus:border-emerald-500 text-xs transition-colors rounded-none placeholder:text-neutral-700"
+                      className="w-full bg-[#0d0d0d] border border-neutral-800 p-2.5 pl-3 text-white font-mono focus:outline-none focus:border-white text-xs transition-colors rounded-none placeholder:text-neutral-700"
                     />
                   </div>
                 </div>
@@ -217,7 +217,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
                       value={hustle}
                       onChange={(e) => setHustle(e.target.value)}
                       placeholder="e.g. SEO speed audits, micro-SaaS"
-                      className="w-full bg-[#0d0d0d] border border-neutral-800 p-2.5 pl-3 text-white font-mono focus:outline-none focus:border-emerald-500 text-xs transition-colors rounded-none placeholder:text-neutral-700"
+                      className="w-full bg-[#0d0d0d] border border-neutral-800 p-2.5 pl-3 text-white font-mono focus:outline-none focus:border-white text-xs transition-colors rounded-none placeholder:text-neutral-700"
                     />
                   </div>
                 </div>
@@ -234,7 +234,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="e.g. operator@obsessionos.net"
-                      className="w-full bg-[#0d0d0d] border border-neutral-800 p-2.5 pl-3 text-white font-mono focus:outline-none focus:border-emerald-500 text-xs transition-colors rounded-none placeholder:text-neutral-700"
+                      className="w-full bg-[#0d0d0d] border border-neutral-800 p-2.5 pl-3 text-white font-mono focus:outline-none focus:border-white text-xs transition-colors rounded-none placeholder:text-neutral-700"
                     />
                   </div>
                 </div>
@@ -253,7 +253,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
                 {/* Submission Action Button */}
                 <button
                   type="submit"
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/10 active:scale-[0.99]"
+                  className="w-full py-3 bg-white hover:bg-neutral-200 text-black font-bold text-xs uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg active:scale-[0.99]"
                 >
                   <Sparkles className="w-4 h-4 text-black animate-pulse" />
                   INITIALIZE OBSESSION OS
@@ -274,13 +274,13 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
             {/* COLUMN 2: ACTIVE REGISTERED OPERATORS LEDGER (ASCII TABLE) */}
             <div className="md:col-span-6 relative border border-neutral-800 bg-[#0a0a0a] p-6 shadow-md flex flex-col h-full self-stretch justify-between">
               <div>
-                <div className="absolute top-[-10px] left-[15px] bg-[#050505] px-2 text-[10px] text-emerald-400 tracking-wider uppercase font-bold">
+                <div className="absolute top-[-10px] left-[15px] bg-[#050505] px-2 text-[10px] text-white tracking-wider uppercase font-bold">
                   DISTRIBUTED OPERATOR REGISTER
                 </div>
                 
                 <div className="flex items-center justify-between border-b border-neutral-900 pb-2 mb-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-emerald-500/80" />
+                    <Database className="w-3.5 h-3.5 text-white/60" />
                     Distributed Operational Ledger
                   </span>
                   <span className="text-[9px] text-neutral-600 font-mono">
@@ -311,7 +311,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
                       <div
                         key={idx}
                         className={`grid grid-cols-12 p-2 hover:bg-neutral-900/30 transition-colors items-center ${
-                          name && op.name.toLowerCase() === name.toLowerCase() ? "bg-emerald-950/20 text-emerald-400 border-l-2 border-l-emerald-500 pl-1.5" : "text-neutral-300"
+                          name && op.name.toLowerCase() === name.toLowerCase() ? "bg-white/5 text-white border-l-2 border-l-white pl-1.5" : "text-neutral-300"
                         }`}
                       >
                         <span className="col-span-4 truncate font-semibold pr-1">{op.name}</span>
@@ -319,7 +319,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
                         <span className="col-span-3 text-right">
                           <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold tracking-wider border ${
                             op.status === "ACTIVE"
-                              ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50"
+                              ? "bg-white/10 text-white border-white/20"
                               : "bg-amber-950/40 text-amber-500 border-amber-900/30"
                           }`}>
                             {op.status}
@@ -334,7 +334,7 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
               {/* Secure Key Metadata Box */}
               <div className="mt-6 p-3 bg-[#0c0c0c] border border-neutral-900 text-[9px] text-neutral-600 leading-relaxed font-mono space-y-1">
                 <div className="font-bold text-neutral-500 flex items-center gap-1 uppercase">
-                  <CheckCircle className="w-3 h-3 text-emerald-500/60" />
+                  <CheckCircle className="w-3 h-3 text-white/60" />
                   LEDGER CRYPTO ACCENTS
                 </div>
                 <div>SECURE_SHIELD: LOCAL_PERSISTENCE_LAYER_V2</div>

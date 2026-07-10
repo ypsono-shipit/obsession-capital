@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { RefreshCw } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { RefreshCw, LogOut, User } from "lucide-react";
 import { MetricConfig, DailyLog, ForgeIdea, PodMember, CodexPlaybook } from "../types";
 import Heatmap from "../components/Heatmap";
 import ForgeSection from "../components/ForgeSection";
@@ -51,6 +51,8 @@ export default function Win3App() {
   const [commitment, setCommitment] = useState("Ship 15 audits per week & log daily");
   const [editingCommitment, setEditingCommitment] = useState(false);
   const [commitDraft, setCommitDraft] = useState(commitment);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   // Wizard state
   const [wizardIdeaId, setWizardIdeaId] = useState<string | null>(null);
@@ -73,6 +75,30 @@ export default function Win3App() {
 
   useEffect(() => { localStorage.setItem("obsession_logs", JSON.stringify(logs)); }, [logs]);
   useEffect(() => { localStorage.setItem("w3_ideas", JSON.stringify(ideas)); }, [ideas]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleLogout = () => {
+    ["w3_name", "w3_hustle", "w3_email", "w3_ideas", "w3_goal", "w3_task_list",
+     `w3_checks_${TODAY}`].forEach(k => localStorage.removeItem(k));
+    setProfile(null);
+    setIdeas([]);
+    setLogs([]);
+    setActiveGoal("");
+    setActiveTasks([]);
+    setTaskChecks([]);
+    setWizardIdeaId(null);
+    setShowProfileMenu(false);
+    setShowLanding(true);
+  };
 
   // Load all user data from Supabase when profile is known
   useEffect(() => {
@@ -342,14 +368,44 @@ export default function Win3App() {
           ))}
         </div>
 
-        <div className="flex gap-4 text-right">
-          <div className="border-l border-neutral-800 pl-4">
-            <div className="text-[9px] text-[#555] uppercase">This Week</div>
-            <div className="text-emerald-400 font-bold">${weeklySum} / ${metric.weeklyGoal}</div>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-4 text-right">
+            <div className="border-l border-neutral-800 pl-4">
+              <div className="text-[9px] text-[#555] uppercase">This Week</div>
+              <div className="text-emerald-400 font-bold">${weeklySum} / ${metric.weeklyGoal}</div>
+            </div>
+            <div className="border-l border-neutral-800 pl-4">
+              <div className="text-[9px] text-[#555] uppercase">Month Total</div>
+              <div className="text-white font-bold">${monthTotal}</div>
+            </div>
           </div>
-          <div className="border-l border-neutral-800 pl-4">
-            <div className="text-[9px] text-[#555] uppercase">Month Total</div>
-            <div className="text-white font-bold">${monthTotal}</div>
+
+          {/* Account menu */}
+          <div className="relative border-l border-neutral-800 pl-4" ref={profileMenuRef}>
+            <button
+              onClick={() => setShowProfileMenu(v => !v)}
+              className="flex items-center gap-1.5 text-[#555] hover:text-white transition cursor-pointer"
+            >
+              <User className="w-3.5 h-3.5" />
+              <span className="text-[10px] font-mono uppercase tracking-widest">{profile?.name || "Account"}</span>
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[#0d0d0d] border border-[#333] z-40">
+                <div className="px-3 py-2.5 border-b border-[#222]">
+                  <div className="text-[10px] font-mono text-white truncate">{profile?.name}</div>
+                  <div className="text-[9px] font-mono text-[#555] truncate">{profile?.email}</div>
+                  {profile?.hustle && <div className="text-[9px] font-mono text-emerald-600 truncate mt-0.5">{profile.hustle}</div>}
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-[10px] font-mono text-rose-400 hover:bg-rose-950/30 transition cursor-pointer uppercase tracking-widest"
+                >
+                  <LogOut className="w-3 h-3" />
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

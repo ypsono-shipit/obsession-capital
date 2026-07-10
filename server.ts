@@ -428,6 +428,7 @@ app.post("/api/ideas", async (req, res) => {
   const { error } = await supabase.from("ideas").upsert({
     id: idea.id, email: idea.email, title: idea.title, category: idea.category,
     description: idea.description, metrics_goals: idea.metricsGoals || "",
+    github_url: idea.githubUrl || null, biz_info: idea.bizInfo || null,
     critique: idea.critique, assumption: idea.assumption, experiments: idea.experiments,
     status: idea.status, updated_at: new Date().toISOString(),
   });

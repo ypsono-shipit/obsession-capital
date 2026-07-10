@@ -16,6 +16,8 @@ export interface ForgeIdea {
   category: "Side Hustle" | "Career Advancement" | "Negotiation" | "Skill Prototypes";
   description: string;
   metricsGoals: string;
+  githubUrl?: string;
+  bizInfo?: string;
   createdAt: string;
   critique?: string;
   assumption?: string;

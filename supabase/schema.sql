@@ -18,6 +18,8 @@ create table if not exists ideas (
   category text not null default 'Side Hustle',
   description text not null default '',
   metrics_goals text not null default '',
+  github_url text,
+  biz_info text,
   critique text,
   assumption text,
   experiments jsonb,

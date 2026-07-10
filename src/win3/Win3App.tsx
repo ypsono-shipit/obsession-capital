@@ -88,6 +88,8 @@ export default function Win3App() {
         const mapped = remoteIdeas.map((i: any) => ({
           id: i.id, title: i.title, category: i.category,
           description: i.description, metricsGoals: i.metrics_goals,
+          githubUrl: i.github_url ?? undefined,
+          bizInfo: i.biz_info ?? undefined,
           critique: i.critique, assumption: i.assumption, experiments: i.experiments,
           status: i.status, createdAt: i.created_at,
         }));
@@ -175,18 +177,15 @@ export default function Win3App() {
 
   const handleForgeSubmit = (ideaText: string, github: string, bizInfo: string) => {
     const title = ideaText.split(/[.!?\n]/)[0].slice(0, 80) || ideaText.slice(0, 80);
-    const description = [
-      ideaText,
-      github ? `\nGitHub: ${github}` : "",
-      bizInfo ? `\nBusiness context: ${bizInfo}` : "",
-    ].filter(Boolean).join("\n");
 
     const newIdea: ForgeIdea = {
       id: `idea-${Date.now()}`,
       title,
       category: "Side Hustle",
-      description,
+      description: ideaText,
       metricsGoals: "",
+      githubUrl: github || undefined,
+      bizInfo: bizInfo || undefined,
       createdAt: new Date().toISOString(),
       status: "Draft",
     };
@@ -200,7 +199,13 @@ export default function Win3App() {
         body: JSON.stringify({ ...newIdea, email: profile.email }),
       }).catch(console.error);
     }
-    fetchCritique(newIdea.id, newIdea.title, newIdea.category, description, "");
+    // Give AI the full context but store fields separately
+    const aiDescription = [
+      ideaText,
+      github ? `\nGitHub: ${github}` : "",
+      bizInfo ? `\nBusiness context: ${bizInfo}` : "",
+    ].filter(Boolean).join("\n");
+    fetchCritique(newIdea.id, newIdea.title, newIdea.category, aiDescription, "");
   };
 
   const handleImportPlaybook = async (playbook: CodexPlaybook) => {

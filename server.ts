@@ -25,13 +25,16 @@ if (!OPENROUTER_API_KEY) {
   console.warn("⚠️  OPENROUTER_API_KEY not found. AI features will use rule-based fallbacks.");
 }
 
-async function aiChat(prompt: string, retries = 3): Promise<string> {
+async function aiChat(prompt: string, retries = 2): Promise<string> {
   if (!OPENROUTER_API_KEY) throw new Error("No API key");
   let lastErr: any;
   for (let i = 0; i < retries; i++) {
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000); // 12s hard timeout
       const res = await fetch(OR_BASE, {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
@@ -43,6 +46,7 @@ async function aiChat(prompt: string, retries = 3): Promise<string> {
           messages: [{ role: "user", content: prompt }],
         }),
       });
+      clearTimeout(timer);
       if (!res.ok) {
         const txt = await res.text();
         throw new Error(`OpenRouter ${res.status}: ${txt}`);
@@ -52,7 +56,7 @@ async function aiChat(prompt: string, retries = 3): Promise<string> {
     } catch (err: any) {
       lastErr = err;
       const msg = err?.message || "";
-      const isTransient = msg.includes("503") || msg.includes("429") || msg.includes("overloaded");
+      const isTransient = msg.includes("503") || msg.includes("429") || msg.includes("overloaded") || msg.includes("abort");
       if (!isTransient || i === retries - 1) break;
       const delay = 1000 * Math.pow(2, i);
       console.warn(`[OpenRouter] Retry ${i + 1} in ${delay}ms:`, msg);
@@ -660,7 +664,7 @@ Return a JSON object with a single key "ideas" containing an array of exactly 5 
 
 async function runDailyScrape() {
   const ideas = await scrapeRedditIdeas();
-  saveDailyCache(ideas);
+  await saveDailyCache(ideas);
   console.log(`[Scraper] Saved ${ideas.length} ideas for ${todayStr()}`);
 }
 
@@ -712,9 +716,10 @@ app.get("/api/daily-ideas", async (req, res) => {
 });
 
 // ----------------------------------------------------
-// API: Manually trigger a scrape (admin/dev)
+// API: Manually trigger a scrape (admin/dev + Vercel Cron)
+// Vercel Cron sends GET; manual refresh button sends POST — handle both.
 // ----------------------------------------------------
-app.post("/api/scrape-ideas", async (req, res) => {
+async function handleScrape(req: any, res: any) {
   try {
     await runDailyScrape();
     const cache = await loadDailyCache();
@@ -722,7 +727,9 @@ app.post("/api/scrape-ideas", async (req, res) => {
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message });
   }
-});
+}
+app.get("/api/scrape-ideas", handleScrape);
+app.post("/api/scrape-ideas", handleScrape);
 
 // ----------------------------------------------------
 // Vite Dev & Production Client Setup

@@ -30,7 +30,7 @@ export default function Win3App() {
     return name && hustle && email ? { name, hustle, email } : null;
   });
   const [tab, setTab] = useState<Tab>("forge");
-  const [showPathModal, setShowPathModal] = useState(false);
+  const [showPathModal, setShowPathModal] = useState(() => !!localStorage.getItem("w3_email"));
   const [metric, setMetric] = useState<MetricConfig>(() => {
     const s = localStorage.getItem("obsession_metric");
     if (s) { try { return JSON.parse(s); } catch { /* */ } }

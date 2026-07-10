@@ -1,0 +1,6 @@
+{
+  "name": "Obsession OS",
+  "description": "The focused Income Growth Operating System. Track your core income metric with the Heatmap, validate ideas with the AI Forge, discover opportunities in the Idea Blackhole, and stay accountable with Obsession Pods and Leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

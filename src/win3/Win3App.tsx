@@ -1,0 +1,500 @@
+import React, { useState, useEffect } from "react";
+import { RefreshCw } from "lucide-react";
+import { MetricConfig, DailyLog, ForgeIdea, PodMember, CodexPlaybook } from "../types";
+import Heatmap from "../components/Heatmap";
+import ForgeSection from "../components/ForgeSection";
+import SwipeCards3 from "./SwipeCards3";
+import ForgeHero from "./ForgeHero";
+import AsciiLanding from "../components/AsciiLanding";
+import IdeaWizard from "./IdeaWizard";
+
+const DEFAULT_METRIC: MetricConfig = { name: "Side Hustle Revenue", unit: "USD", weeklyGoal: 700 };
+
+const TODAY = new Date().toISOString().split("T")[0];
+
+const POD_MEMBERS: PodMember[] = [
+  { name: "You", role: "Audits & Speed Opt", streak: 8, commitment: "15 audits shipped", heatmapSeed: [4, 3, 4, 0, 4, 3, 4] },
+  { name: "cyber_hustler", role: "Niche Substack", streak: 12, commitment: "1 newsletter published", heatmapSeed: [2, 3, 2, 4, 3, 0, 2] },
+  { name: "quantum_coder", role: "API SaaS", streak: 5, commitment: "Send 20 cold pitches", heatmapSeed: [0, 4, 0, 4, 0, 4, 2] },
+  { name: "zen_negotiator", role: "Enterprise Sales", streak: 3, commitment: "Draft 2 proposals", heatmapSeed: [3, 0, 3, 0, 3, 2, 3] },
+];
+
+type Tab = "scoreboard" | "ideas" | "forge" | "pod";
+
+export default function Win3App() {
+  const [showLanding, setShowLanding] = useState<boolean>(() => !localStorage.getItem("w3_email"));
+  const [profile, setProfile] = useState<{ name: string; hustle: string; email: string } | null>(() => {
+    const name = localStorage.getItem("w3_name");
+    const hustle = localStorage.getItem("w3_hustle");
+    const email = localStorage.getItem("w3_email");
+    return name && hustle && email ? { name, hustle, email } : null;
+  });
+  const [tab, setTab] = useState<Tab>("scoreboard");
+  const [metric] = useState<MetricConfig>(() => {
+    const s = localStorage.getItem("obsession_metric");
+    if (s) { try { return JSON.parse(s); } catch { /* */ } }
+    return DEFAULT_METRIC;
+  });
+  const [logs, setLogs] = useState<DailyLog[]>(() => {
+    const s = localStorage.getItem("obsession_logs");
+    if (s) { try { return JSON.parse(s); } catch { /* */ } }
+    return [];
+  });
+  const [ideas, setIdeas] = useState<ForgeIdea[]>(() => {
+    const s = localStorage.getItem("w3_ideas");
+    if (s) { try { return JSON.parse(s); } catch { /* */ } }
+    return [];
+  });
+  const [aiInsight, setAiInsight] = useState("");
+  const [aiBadge, setAiBadge] = useState("");
+  const [loadingInsight, setLoadingInsight] = useState(false);
+  const [commitment, setCommitment] = useState("Ship 15 audits per week & log daily");
+  const [editingCommitment, setEditingCommitment] = useState(false);
+  const [commitDraft, setCommitDraft] = useState(commitment);
+
+  // Wizard state
+  const [wizardIdeaId, setWizardIdeaId] = useState<string | null>(null);
+  const wizardIdea = wizardIdeaId ? ideas.find(i => i.id === wizardIdeaId) ?? null : null;
+
+  // Active mission (set when wizard completes)
+  const [activeGoal, setActiveGoal] = useState(() => localStorage.getItem("w3_goal") || "");
+  const [activeTasks, setActiveTasks] = useState<string[]>(() => {
+    const s = localStorage.getItem("w3_task_list");
+    if (s) try { return JSON.parse(s); } catch {}
+    return [];
+  });
+  const [taskChecks, setTaskChecks] = useState<boolean[]>(() => {
+    const s = localStorage.getItem(`w3_checks_${TODAY}`);
+    if (s) try { return JSON.parse(s); } catch {}
+    const list = localStorage.getItem("w3_task_list");
+    const count = list ? JSON.parse(list).length : 0;
+    return new Array(count).fill(false);
+  });
+
+  useEffect(() => { localStorage.setItem("obsession_logs", JSON.stringify(logs)); }, [logs]);
+  useEffect(() => { localStorage.setItem("w3_ideas", JSON.stringify(ideas)); }, [ideas]);
+
+  const fetchInsight = async () => {
+    if (logs.length === 0) return;
+    setLoadingInsight(true);
+    try {
+      const res = await fetch("/api/generate-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metricName: metric.name, metricUnit: metric.unit, logs }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiInsight(data.insight);
+        setAiBadge(data.badge);
+      }
+    } catch (e) { console.error(e); }
+    finally { setLoadingInsight(false); }
+  };
+
+  const handleSaveLog = (date: string, value: number, note: string) => {
+    setLogs(prev => {
+      const idx = prev.findIndex(l => l.date === date);
+      if (idx > -1) {
+        const updated = [...prev];
+        updated[idx] = { date, value, note };
+        return updated;
+      }
+      return [...prev, { date, value, note }].sort((a, b) => b.date.localeCompare(a.date));
+    });
+  };
+
+  const handleBulkUpdateLogs = (newLogs: DailyLog[]) => setLogs(newLogs);
+
+  const handleAddIdea = (newIdea: Omit<ForgeIdea, "id" | "createdAt" | "status">) => {
+    setIdeas(prev => [{ ...newIdea, id: `idea-${Date.now()}`, createdAt: new Date().toISOString(), status: "Draft" }, ...prev]);
+  };
+  const handleUpdateIdea = (id: string, updates: Partial<ForgeIdea>) => {
+    setIdeas(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+  };
+  const handleDeleteIdea = (id: string) => setIdeas(prev => prev.filter(i => i.id !== id));
+
+  const fetchCritique = async (ideaId: string, title: string, category: string, description: string, metricsGoals: string) => {
+    try {
+      const res = await fetch("/api/forge-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, category, description, metricsGoals }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIdeas(prev => prev.map(i => i.id === ideaId
+          ? { ...i, critique: data.critique, assumption: data.assumption, experiments: data.experiments, status: "Validation Active" }
+          : i
+        ));
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleForgeSubmit = (ideaText: string, github: string, bizInfo: string) => {
+    const title = ideaText.split(/[.!?\n]/)[0].slice(0, 80) || ideaText.slice(0, 80);
+    const description = [
+      ideaText,
+      github ? `\nGitHub: ${github}` : "",
+      bizInfo ? `\nBusiness context: ${bizInfo}` : "",
+    ].filter(Boolean).join("\n");
+
+    const newIdea: ForgeIdea = {
+      id: `idea-${Date.now()}`,
+      title,
+      category: "Side Hustle",
+      description,
+      metricsGoals: "",
+      createdAt: new Date().toISOString(),
+      status: "Draft",
+    };
+
+    setIdeas(prev => [newIdea, ...prev]);
+    setWizardIdeaId(newIdea.id);
+    fetchCritique(newIdea.id, newIdea.title, newIdea.category, description, "");
+  };
+
+  const handleImportPlaybook = async (playbook: CodexPlaybook) => {
+    const existing = ideas.find(i => i.title === playbook.title);
+    if (existing) {
+      setWizardIdeaId(existing.id);
+      return;
+    }
+
+    const description = `${playbook.summary}\n\nSteps:\n${playbook.steps.join("\n")}`;
+    const newIdea: ForgeIdea = {
+      id: `idea-${Date.now()}`,
+      title: playbook.title,
+      category: "Side Hustle",
+      description,
+      metricsGoals: playbook.metrics,
+      createdAt: new Date().toISOString(),
+      status: "Draft",
+    };
+
+    setIdeas(prev => [newIdea, ...prev]);
+    setWizardIdeaId(newIdea.id);
+    fetchCritique(newIdea.id, newIdea.title, newIdea.category, description, playbook.metrics);
+  };
+
+  const handleWizardComplete = (goal: string, tasks: string[]) => {
+    setActiveGoal(goal);
+    setActiveTasks(tasks);
+    const checks = new Array(tasks.length).fill(false);
+    setTaskChecks(checks);
+    localStorage.setItem("w3_goal", goal);
+    localStorage.setItem("w3_task_list", JSON.stringify(tasks));
+    localStorage.setItem(`w3_checks_${TODAY}`, JSON.stringify(checks));
+    setWizardIdeaId(null);
+    setTab("scoreboard");
+  };
+
+  const toggleTask = (i: number) => {
+    setTaskChecks(prev => {
+      const next = [...prev];
+      next[i] = !next[i];
+      localStorage.setItem(`w3_checks_${TODAY}`, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
+  const weeklySum = last7.reduce((s, d) => s + (logs.find(l => l.date === d)?.value || 0), 0);
+  const monthStr = TODAY.slice(0, 7);
+  const monthTotal = logs.filter(l => l.date.startsWith(monthStr)).reduce((s, l) => s + l.value, 0);
+
+  const TABS: { id: Tab; label: string }[] = [
+    { id: "ideas", label: "Ideas" },
+    { id: "forge", label: "Forge" },
+    { id: "scoreboard", label: "Scoreboard" },
+    { id: "pod", label: "Pod" },
+  ];
+
+  if (showLanding) {
+    return (
+      <AsciiLanding
+        onActivate={(p) => {
+          localStorage.setItem("w3_name", p.name);
+          localStorage.setItem("w3_hustle", p.hustle);
+          localStorage.setItem("w3_email", p.email);
+          setProfile(p);
+          setShowLanding(false);
+        }}
+        currentProfile={profile}
+        onClose={profile ? () => setShowLanding(false) : undefined}
+      />
+    );
+  }
+
+  return (
+    <div className="h-screen bg-[#070707] text-[#d1d1d1] font-mono text-xs flex flex-col selection:bg-white selection:text-black">
+
+      {/* Wizard overlay */}
+      {wizardIdea && (
+        <IdeaWizard
+          idea={wizardIdea}
+          onComplete={handleWizardComplete}
+          onClose={() => setWizardIdeaId(null)}
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex-none border-b border-[#222] bg-[#0a0a0a] px-6 py-4 flex items-center justify-between">
+        <span className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider">
+          [ OBSESSION_OS ]
+        </span>
+
+        <div className="flex items-center gap-1">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-1.5 text-[10px] uppercase tracking-widest font-bold transition ${
+                tab === t.id ? "bg-white text-black" : "text-[#666] hover:text-white"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-4 text-right">
+          <div className="border-l border-neutral-800 pl-4">
+            <div className="text-[9px] text-[#555] uppercase">This Week</div>
+            <div className="text-emerald-400 font-bold">${weeklySum} / ${metric.weeklyGoal}</div>
+          </div>
+          <div className="border-l border-neutral-800 pl-4">
+            <div className="text-[9px] text-[#555] uppercase">Month Total</div>
+            <div className="text-white font-bold">${monthTotal}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto p-6">
+
+        {/* TAB: SCOREBOARD */}
+        {tab === "scoreboard" && (
+          <div className="space-y-6 max-w-5xl mx-auto">
+
+            {/* Active Mission */}
+            {activeGoal && activeTasks.length > 0 && (
+              <div className="relative border border-[#333] p-5 bg-[#0a0a0a]">
+                <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                  Active Mission
+                </div>
+                <div className="mt-1 space-y-4">
+                  <p className="text-xs font-mono text-white leading-relaxed">{activeGoal}</p>
+
+                  <div className="space-y-2.5">
+                    {activeTasks.map((task, i) => (
+                      <label key={i} onClick={() => toggleTask(i)} className="flex items-start gap-3 cursor-pointer group">
+                        <div className={`w-4 h-4 border flex-shrink-0 mt-0.5 flex items-center justify-center transition ${
+                          taskChecks[i] ? "border-emerald-500 bg-emerald-950" : "border-[#444] group-hover:border-neutral-500"
+                        }`}>
+                          {taskChecks[i] && <span className="text-emerald-400 text-[9px] leading-none">✓</span>}
+                        </div>
+                        <span className={`text-xs font-mono leading-relaxed transition ${
+                          taskChecks[i] ? "text-neutral-600 line-through" : "text-neutral-300 group-hover:text-white"
+                        }`}>
+                          {task}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[9px] font-mono text-[#444] uppercase tracking-widest">
+                      {taskChecks.filter(Boolean).length}/{activeTasks.length} done today
+                    </span>
+                    <button
+                      onClick={() => { setTab("pod"); }}
+                      className="text-[9px] font-mono text-[#444] uppercase tracking-widest hover:text-white transition cursor-pointer"
+                    >
+                      View Pod →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Income Heatmap */}
+            <div className="relative border border-[#333] p-4 bg-[#0a0a0a]">
+              <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                Income Heatmap
+              </div>
+              <div className="mt-1">
+                <Heatmap logs={logs} metric={metric} onSaveLog={handleSaveLog} onBulkUpdateLogs={handleBulkUpdateLogs} />
+              </div>
+            </div>
+
+            {/* AI Co-Pilot */}
+            <div className="relative border border-[#333] p-5 bg-[#0a0a0a]">
+              <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                AI Co-Pilot
+              </div>
+              <div className="mt-1 space-y-3">
+                {aiInsight ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950 border border-emerald-900 px-1.5 py-0.5 uppercase tracking-widest font-bold">{aiBadge}</span>
+                      <button onClick={fetchInsight} disabled={loadingInsight} className="text-[9px] font-mono text-neutral-500 uppercase tracking-widest hover:text-white transition flex items-center gap-1 cursor-pointer disabled:opacity-50">
+                        {loadingInsight ? <RefreshCw className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                        Refresh
+                      </button>
+                    </div>
+                    <p className="text-xs font-mono text-neutral-300 leading-relaxed whitespace-pre-wrap">{aiInsight}</p>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-neutral-600">Log your income to activate AI analysis.</span>
+                    {logs.length > 0 && (
+                      <button onClick={fetchInsight} disabled={loadingInsight} className="bg-white text-black font-mono text-[10px] px-3 py-1.5 uppercase font-bold hover:bg-neutral-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
+                        {loadingInsight ? <RefreshCw className="w-3 h-3 animate-spin" /> : "Analyse"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: IDEAS */}
+        {tab === "ideas" && (
+          <div className="space-y-6 max-w-5xl mx-auto">
+            <div className="relative border border-[#333] p-6 bg-[#0a0a0a]">
+              <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                Idea Feed // Swipe to Forge
+              </div>
+              <div className="mt-2">
+                <SwipeCards3 onImport={handleImportPlaybook} onGoToForge={() => setTab("forge")} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: FORGE */}
+        {tab === "forge" && (
+          <div className="space-y-8">
+            {/* Hero with video + chat bar */}
+            <div className="-mx-6 -mt-6">
+              <ForgeHero onSubmit={handleForgeSubmit} loading={false} />
+            </div>
+
+            {/* Existing ideas */}
+            {ideas.length > 0 && (
+              <div className="max-w-5xl mx-auto">
+                <div className="relative border border-[#333] px-1 pt-1 bg-[#0a0a0a]">
+                  <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                    Active Concepts · {ideas.length}
+                  </div>
+                  <ForgeSection
+                    ideas={ideas}
+                    onAddIdea={handleAddIdea}
+                    onUpdateIdea={handleUpdateIdea}
+                    onDeleteIdea={handleDeleteIdea}
+                  />
+                </div>
+              </div>
+            )}
+
+            {ideas.length === 0 && (
+              <div className="max-w-5xl mx-auto text-center text-[10px] font-mono text-neutral-700 uppercase tracking-widest py-4">
+                Your forged ideas will appear here
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: POD */}
+        {tab === "pod" && (
+          <div className="space-y-6 max-w-5xl mx-auto">
+
+            <div className="relative border border-[#333] p-5 bg-[#0a0a0a]">
+              <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                My Commitment
+              </div>
+              <div className="mt-1">
+                {editingCommitment ? (
+                  <div className="flex gap-2">
+                    <input
+                      autoFocus
+                      value={commitDraft}
+                      onChange={e => setCommitDraft(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { setCommitment(commitDraft); setEditingCommitment(false); }
+                        if (e.key === "Escape") setEditingCommitment(false);
+                      }}
+                      className="flex-1 bg-[#0d0d0d] border border-neutral-800 p-2 text-white font-mono focus:outline-none focus:border-neutral-500 text-xs"
+                    />
+                    <button
+                      onClick={() => { setCommitment(commitDraft); setEditingCommitment(false); }}
+                      className="bg-white text-black font-bold px-4 text-xs uppercase cursor-pointer"
+                    >
+                      Set
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-white text-xs">"{commitment}"</span>
+                    <button
+                      onClick={() => { setCommitDraft(commitment); setEditingCommitment(true); }}
+                      className="text-[#555] text-[10px] uppercase tracking-widest hover:text-white transition ml-4 cursor-pointer"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="relative border border-[#333] bg-[#0a0a0a]">
+              <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                ALPHA_EARNERS · {POD_MEMBERS.length} builders
+              </div>
+              <div className="divide-y divide-[#1a1a1a] mt-1">
+                {POD_MEMBERS.map((member, idx) => {
+                  const isMe = idx === 0;
+                  const barColors = ["bg-neutral-900", "bg-emerald-900", "bg-emerald-700", "bg-emerald-500", "bg-emerald-400"];
+                  return (
+                    <div key={member.name} className={`p-4 flex items-center justify-between gap-4 ${isMe ? "bg-neutral-900/30" : ""}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-white font-bold text-xs">{member.name}</span>
+                          <span className="text-[8px] bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 text-neutral-500 uppercase font-mono">
+                            {member.role}
+                          </span>
+                          {isMe && (
+                            <span className="text-[8px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 font-mono uppercase font-bold">
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-neutral-500 truncate">"{isMe ? commitment : member.commitment}"</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <span className="text-[10px] font-mono text-emerald-400">{member.streak}D streak</span>
+                        <div className="flex gap-1">
+                          {member.heatmapSeed.map((v, i) => (
+                            <div key={i} className={`w-3 h-3 ${barColors[v]}`} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

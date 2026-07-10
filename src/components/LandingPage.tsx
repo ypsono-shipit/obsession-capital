@@ -34,7 +34,7 @@ export default function LandingPage() {
             </a>
           ))}
         </div>
-        <a href="/win3" className="border border-white text-white text-xs font-bold tracking-widest uppercase px-5 py-2.5 hover:bg-white hover:text-black transition-all">
+        <a href="/win" className="border border-white text-white text-xs font-bold tracking-widest uppercase px-5 py-2.5 hover:bg-white hover:text-black transition-all">
           Enter
         </a>
       </nav>
@@ -114,7 +114,7 @@ export default function LandingPage() {
         {/* CTA */}
         <div className="relative z-10 mt-12 text-center">
           <a
-            href="/win3"
+            href="/win"
             className="inline-flex items-center gap-4 bg-white text-black font-bold text-sm tracking-widest uppercase px-14 py-5 hover:bg-white/90 transition-colors"
           >
             Enter

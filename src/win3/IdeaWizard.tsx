@@ -8,12 +8,11 @@ interface Props {
   onClose: () => void;
 }
 
-type Step = "critique" | "goals" | "launch";
+type Step = "critique" | "goals";
 
 const STEPS = [
   { id: "critique" as const, label: "Critique" },
   { id: "goals" as const, label: "Goals" },
-  { id: "launch" as const, label: "Launch" },
 ];
 
 export default function IdeaWizard({ idea, onComplete, onClose }: Props) {
@@ -55,10 +54,10 @@ export default function IdeaWizard({ idea, onComplete, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 bg-[#070707]/95 flex items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-2xl bg-[#0a0a0a] border border-[#333]">
+      <div className="w-full max-w-2xl bg-[#0a0a0a] border border-[#333] max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Stepper header */}
-        <div className="border-b border-[#222] px-6 py-4 flex items-center justify-between">
+        <div className="border-b border-[#222] px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-0">
             {STEPS.map((s, i) => (
               <React.Fragment key={s.id}>
@@ -77,7 +76,7 @@ export default function IdeaWizard({ idea, onComplete, onClose }: Props) {
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">
 
           {/* STEP 1: CRITIQUE */}
           {step === "critique" && (
@@ -217,52 +216,11 @@ export default function IdeaWizard({ idea, onComplete, onClose }: Props) {
                   ← Back
                 </button>
                 <button
-                  onClick={() => setStep("launch")}
+                  onClick={() => onComplete(goal, tasks.filter(t => t.trim()))}
                   disabled={!goal.trim() || tasks.filter(t => t.trim()).length === 0 || goalsLoading}
                   className="bg-white text-black font-mono text-[10px] font-bold px-5 py-2.5 uppercase tracking-widest hover:bg-neutral-200 transition flex items-center gap-2 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  Lock it in <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: LAUNCH */}
-          {step === "launch" && (
-            <div className="space-y-6">
-              <div className="text-center py-4">
-                <div className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest mb-3">You're live.</div>
-                <h2 className="text-white text-lg font-mono font-light leading-snug">{idea.title}</h2>
-              </div>
-
-              <div className="border border-emerald-500/30 p-4 bg-emerald-950/20">
-                <div className="text-[9px] font-mono text-emerald-400 uppercase tracking-widest mb-2">Your 90-Day Goal</div>
-                <p className="text-xs font-mono text-neutral-200 leading-relaxed">{goal}</p>
-              </div>
-
-              <div className="border border-[#222] p-4 bg-[#0d0d0d]">
-                <div className="text-[9px] font-mono text-[#555] uppercase tracking-widest mb-3">
-                  {tasks.filter(t => t.trim()).length} tasks locked in
-                </div>
-                <ul className="space-y-2">
-                  {tasks.filter(t => t.trim()).map((t, i) => (
-                    <li key={i} className="text-xs font-mono text-neutral-400 flex gap-2 leading-relaxed">
-                      <span className="text-[#333] flex-shrink-0">→</span> {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="text-center text-[10px] font-mono text-[#444] uppercase tracking-widest">
-                Check your scoreboard daily · your pod is watching
-              </div>
-
-              <div className="flex justify-center">
-                <button
-                  onClick={() => onComplete(goal, tasks.filter(t => t.trim()))}
-                  className="bg-emerald-500 text-black font-mono text-[10px] font-bold px-8 py-3 uppercase tracking-widest hover:bg-emerald-400 transition flex items-center gap-2 cursor-pointer"
-                >
-                  Go to Scoreboard <ArrowRight className="w-3.5 h-3.5" />
+                  Lock in → Scoreboard <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

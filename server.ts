@@ -625,20 +625,21 @@ async function runDailyScrape() {
   console.log(`[Scraper] Saved ${ideas.length} ideas for ${todayStr()}`);
 }
 
-// Run once on startup if cache is stale or missing
-loadDailyCache().then(cached => {
-  if (!cached) {
-    runDailyScrape().catch(e => console.error("[Scraper] Startup scrape failed:", e));
-  } else {
-    console.log(`[Scraper] Cache fresh for ${todayStr()}, skipping startup scrape`);
-  }
-});
+// Cron + startup scrape only in non-Vercel environments
+if (!process.env.VERCEL) {
+  loadDailyCache().then(cached => {
+    if (!cached) {
+      runDailyScrape().catch(e => console.error("[Scraper] Startup scrape failed:", e));
+    } else {
+      console.log(`[Scraper] Cache fresh for ${todayStr()}, skipping startup scrape`);
+    }
+  });
 
-// Cron: every day at 6:00 AM server time
-cron.schedule("0 6 * * *", () => {
-  console.log("[Cron] Daily idea scrape triggered");
-  runDailyScrape().catch(e => console.error("[Cron] Scrape failed:", e));
-});
+  cron.schedule("0 6 * * *", () => {
+    console.log("[Cron] Daily idea scrape triggered");
+    runDailyScrape().catch(e => console.error("[Cron] Scrape failed:", e));
+  });
+}
 
 // ----------------------------------------------------
 // API: Get today's 5 daily ideas
@@ -657,8 +658,8 @@ app.get("/api/daily-ideas", async (req, res) => {
 app.post("/api/scrape-ideas", async (req, res) => {
   try {
     await runDailyScrape();
-    const cache = loadDailyCache();
-    res.json({ ok: true, date: cache?.date, count: cache?.ideas.length });
+    const cache = await loadDailyCache();
+    res.json({ ok: true, date: cache?.date, count: Array.isArray(cache?.ideas) ? cache.ideas.length : 0 });
   } catch (e: any) {
     res.status(500).json({ ok: false, error: e?.message });
   }
@@ -687,4 +688,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

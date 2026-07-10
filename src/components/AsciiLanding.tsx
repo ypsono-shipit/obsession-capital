@@ -13,12 +13,7 @@ interface AsciiLandingProps {
   onClose?: () => void;
 }
 
-const DEFAULT_OPERATORS: Operator[] = [
-  { name: "Root Operator", hustle: "SEO Audit Micro-Agency", status: "ACTIVE" },
-  { name: "cyber_hustler", hustle: "Niche Substack Curation", status: "ACTIVE" },
-  { name: "quantum_coder", hustle: "API SaaS Boilerplates", status: "STANDBY" },
-  { name: "zen_negotiator", hustle: "Enterprise Raise Coaching", status: "ACTIVE" },
-];
+const DEFAULT_OPERATORS: Operator[] = [];
 
 export default function AsciiLanding({ onActivate, currentProfile, onClose }: AsciiLandingProps) {
   const [name, setName] = useState(currentProfile?.name || "");
@@ -308,23 +303,23 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
 
                   {/* Ledger Rows */}
                   <div className="divide-y divide-neutral-900/40 max-h-56 overflow-y-auto no-scrollbar">
-                    {operators.map((op, idx) => (
-                      <div 
-                        key={idx} 
+                    {operators.length === 0 ? (
+                      <div className="p-4 text-center text-[10px] text-neutral-700 uppercase tracking-widest">
+                        Awaiting first operators...
+                      </div>
+                    ) : operators.map((op, idx) => (
+                      <div
+                        key={idx}
                         className={`grid grid-cols-12 p-2 hover:bg-neutral-900/30 transition-colors items-center ${
                           name && op.name.toLowerCase() === name.toLowerCase() ? "bg-emerald-950/20 text-emerald-400 border-l-2 border-l-emerald-500 pl-1.5" : "text-neutral-300"
                         }`}
                       >
-                        <span className="col-span-4 truncate font-semibold pr-1">
-                          {op.name}
-                        </span>
-                        <span className="col-span-5 truncate text-neutral-400 text-[9px] uppercase pr-1">
-                          {op.hustle}
-                        </span>
+                        <span className="col-span-4 truncate font-semibold pr-1">{op.name}</span>
+                        <span className="col-span-5 truncate text-neutral-400 text-[9px] uppercase pr-1">{op.hustle}</span>
                         <span className="col-span-3 text-right">
-                          <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold rounded-xs tracking-wider border ${
-                            op.status === "ACTIVE" 
-                              ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50" 
+                          <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold tracking-wider border ${
+                            op.status === "ACTIVE"
+                              ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50"
                               : "bg-amber-950/40 text-amber-500 border-amber-900/30"
                           }`}>
                             {op.status}

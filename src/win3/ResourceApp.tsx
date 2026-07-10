@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { X, LogOut, User, ArrowRight, Lock } from "lucide-react";
-import AsciiLanding from "../components/AsciiLanding";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -276,7 +275,6 @@ export default function ResourceApp() {
     const email = localStorage.getItem("w3_email");
     return name && hustle && email ? { name, hustle, email } : null;
   });
-  const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("w3_email"));
   const [guideOpen, setGuideOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -295,24 +293,7 @@ export default function ResourceApp() {
     ["w3_name", "w3_hustle", "w3_email"].forEach(k => localStorage.removeItem(k));
     setProfile(null);
     setShowProfileMenu(false);
-    setShowLanding(true);
   };
-
-  if (showLanding) {
-    return (
-      <AsciiLanding
-        onActivate={(p) => {
-          localStorage.setItem("w3_name", p.name);
-          localStorage.setItem("w3_hustle", p.hustle);
-          localStorage.setItem("w3_email", p.email);
-          setProfile(p);
-          setShowLanding(false);
-        }}
-        currentProfile={profile}
-        onClose={profile ? () => setShowLanding(false) : undefined}
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#070707] text-[#d1d1d1] font-mono text-xs">
@@ -385,35 +366,43 @@ export default function ResourceApp() {
         </a>
 
         <div className="flex items-center gap-4">
-          <a href="/win" className="text-[10px] font-mono text-[#555] uppercase tracking-widest hover:text-white transition">
-            ← Dashboard
-          </a>
+          {profile && (
+            <a href="/win" className="text-[10px] font-mono text-[#555] uppercase tracking-widest hover:text-white transition">
+              ← Dashboard
+            </a>
+          )}
 
-          <div className="relative border-l border-neutral-800 pl-4" ref={profileMenuRef}>
-            <button
-              onClick={() => setShowProfileMenu(v => !v)}
-              className="flex items-center gap-1.5 text-[#555] hover:text-white transition cursor-pointer"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-mono uppercase tracking-widest">{profile?.name || "Account"}</span>
-            </button>
+          {profile ? (
+            <div className="relative border-l border-neutral-800 pl-4" ref={profileMenuRef}>
+              <button
+                onClick={() => setShowProfileMenu(v => !v)}
+                className="flex items-center gap-1.5 text-[#555] hover:text-white transition cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-mono uppercase tracking-widest">{profile.name}</span>
+              </button>
 
-            {showProfileMenu && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-[#0d0d0d] border border-[#333] z-50">
-                <div className="px-3 py-2.5 border-b border-[#222]">
-                  <div className="text-[10px] font-mono text-white truncate">{profile?.name}</div>
-                  <div className="text-[9px] font-mono text-[#555] truncate">{profile?.email}</div>
+              {showProfileMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-[#0d0d0d] border border-[#333] z-50">
+                  <div className="px-3 py-2.5 border-b border-[#222]">
+                    <div className="text-[10px] font-mono text-white truncate">{profile.name}</div>
+                    <div className="text-[9px] font-mono text-[#555] truncate">{profile.email}</div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-[10px] font-mono text-rose-400 hover:bg-rose-950/30 transition cursor-pointer uppercase tracking-widest"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    Log out
+                  </button>
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-[10px] font-mono text-rose-400 hover:bg-rose-950/30 transition cursor-pointer uppercase tracking-widest"
-                >
-                  <LogOut className="w-3 h-3" />
-                  Log out
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : (
+            <a href="/win" className="text-[10px] font-mono text-[#555] uppercase tracking-widest hover:text-white transition border-l border-neutral-800 pl-4">
+              Login →
+            </a>
+          )}
         </div>
       </div>
 
@@ -495,6 +484,22 @@ export default function ResourceApp() {
             </div>
           ))}
         </div>
+
+        {/* Subtle login nudge */}
+        {!profile && (
+          <div className="mt-10 border-t border-[#141414] pt-8 flex items-center justify-between">
+            <p className="text-[#444] font-mono text-[10px] leading-relaxed">
+              Have a business idea you're obsessed with?<br />
+              <span className="text-[#555]">Forge it, track your income, and join a pod of builders.</span>
+            </p>
+            <a
+              href="/win"
+              className="flex-shrink-0 ml-6 text-[10px] font-mono text-neutral-500 hover:text-white uppercase tracking-widest border border-[#333] hover:border-neutral-600 px-4 py-2 transition flex items-center gap-2"
+            >
+              Get started <ArrowRight className="w-3 h-3" />
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

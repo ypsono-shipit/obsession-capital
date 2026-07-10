@@ -40,7 +40,7 @@ export default function ResourceApp() {
 
       {/* Header */}
       <div className="border-b border-[#222] bg-[#0a0a0a] px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-        <a href="/" className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider text-xs">
+        <a href="https://obsession.club" className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider text-xs">
           [ OBSESSION_OS ]
         </a>
 

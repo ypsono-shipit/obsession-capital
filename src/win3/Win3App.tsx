@@ -437,9 +437,9 @@ export default function Win3App() {
 
       {/* Header */}
       <div className="flex-none border-b border-[#222] bg-[#0a0a0a] px-6 py-4 flex items-center justify-between">
-        <span className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider">
+        <a href="https://obsession.club" className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider text-xs">
           [ OBSESSION_OS ]
-        </span>
+        </a>
 
         <div className="flex items-center gap-1">
           {TABS.map(t => (

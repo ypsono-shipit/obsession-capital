@@ -475,9 +475,9 @@ export default function App() {
       <div className="flex-none p-4 pb-3 border-b border-[#222] bg-[#0a0a0a] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-40">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider">
+            <a href="https://obsession.club" className="text-white font-bold bg-neutral-900 px-2 py-0.5 border border-neutral-800 tracking-wider text-xs">
               [ OBSESSION_OS ]
-            </span>
+            </a>
             <span className="text-[#666] text-[10px]">v1.0.48_STABLE</span>
           </div>
           <div className="text-[#888] text-[10px] mt-1.5 flex items-center gap-1.5 uppercase tracking-wide">

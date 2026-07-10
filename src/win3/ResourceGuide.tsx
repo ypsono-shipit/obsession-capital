@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { LogOut, User, ArrowRight, ArrowLeft } from "lucide-react";
+import { LogOut, User, ArrowRight, ArrowLeft, Mail } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -242,6 +242,66 @@ function GuidePhase({ phase }: { phase: Phase }) {
   );
 }
 
+// ─── Newsletter signup ────────────────────────────────────────────────────────
+
+function NewsletterSignup() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), source: "compounding-second-brain" }),
+      });
+      setStatus(res.ok ? "done" : "error");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "done") {
+    return (
+      <div className="border border-white/10 bg-white/[0.03] px-5 py-4 flex items-center gap-3">
+        <span className="text-white font-mono text-[11px]">✓ You're in. Next playbook drops soon.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-white/10 bg-white/[0.03] px-5 py-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Mail className="w-3.5 h-3.5 text-white/40" />
+        <span className="text-[10px] font-mono text-white/50 uppercase tracking-widest">Get the next playbook free</span>
+      </div>
+      <form onSubmit={submit} className="flex gap-2">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="your@email.com"
+          className="flex-1 bg-transparent border border-white/15 px-3 py-2 font-mono text-[11px] text-white placeholder:text-neutral-600 focus:outline-none focus:border-white/40 transition min-w-0"
+        />
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="bg-white text-black font-mono text-[10px] font-bold px-4 py-2 uppercase tracking-widest hover:bg-neutral-200 transition disabled:opacity-50 whitespace-nowrap"
+        >
+          {status === "loading" ? "..." : "Subscribe"}
+        </button>
+      </form>
+      {status === "error" && (
+        <p className="text-[9px] font-mono text-rose-400 mt-2">Something went wrong — try again.</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ResourceGuide() {
@@ -328,6 +388,11 @@ export default function ResourceGuide() {
           <p className="text-neutral-500 font-mono text-[11px] leading-relaxed border-l-2 border-[#333] pl-4">
             {INTRO}
           </p>
+        </div>
+
+        {/* Newsletter */}
+        <div className="mb-10">
+          <NewsletterSignup />
         </div>
 
         {/* Phases */}

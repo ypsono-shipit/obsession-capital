@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import cron from "node-cron";
 import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
@@ -555,181 +554,130 @@ app.get("/api/operators", async (req, res) => {
 });
 
 // ----------------------------------------------------
-// Daily Ideas Cache (Reddit Scraper — Supabase backed)
+// Newsletter signups → Supabase `newsletter` table
 // ----------------------------------------------------
-
-function todayStr() {
-  return new Date().toISOString().split("T")[0];
-}
-
-async function loadDailyCache() {
-  const { data } = await supabase.from("daily_ideas").select("ideas, date").eq("date", todayStr()).single();
-  return data ?? null;
-}
-
-async function saveDailyCache(ideas: typeof CODEX_PLAYBOOKS) {
-  await supabase.from("daily_ideas").upsert({ date: todayStr(), ideas, scraped_at: new Date().toISOString() });
-}
-
-const SUBREDDITS = ["Entrepreneur", "sidehustle", "smallbusiness"];
-
-async function scrapeRedditIdeas(): Promise<typeof CODEX_PLAYBOOKS> {
-  console.log("[Scraper] Starting Reddit scrape...");
-
-  const posts: { title: string; selftext: string; url: string; score: number; subreddit: string }[] = [];
-
-  for (const sub of SUBREDDITS) {
-    try {
-      const res = await fetch(
-        `https://www.reddit.com/r/${sub}/top.json?t=day&limit=15&raw_json=1`,
-        { headers: { "User-Agent": "ObsessionOS/1.0" } }
-      );
-      if (!res.ok) continue;
-      const data = await res.json() as any;
-      const children = data?.data?.children || [];
-      for (const child of children) {
-        const p = child.data;
-        if (p.is_self && p.selftext?.length > 100) {
-          posts.push({
-            title: p.title,
-            selftext: p.selftext.slice(0, 500),
-            url: `https://reddit.com${p.permalink}`,
-            score: p.score,
-            subreddit: sub,
-          });
-        }
-      }
-    } catch (e) {
-      console.warn(`[Scraper] Failed to fetch r/${sub}:`, e);
-    }
+app.post("/api/newsletter", async (req, res) => {
+  const { email, source } = req.body as { email?: string; source?: string };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "Invalid email" });
   }
-
-  if (posts.length === 0) {
-    console.warn("[Scraper] No posts scraped, falling back to CODEX_PLAYBOOKS");
-    return CODEX_PLAYBOOKS.slice(0, 5);
-  }
-
-  // Sort by score, take top 10 to feed to Gemini
-  const topPosts = posts.sort((a, b) => b.score - a.score).slice(0, 10);
-
-  const prompt = `You are an entrepreneurship opportunity analyst for Obsession OS.
-
-I've scraped these top Reddit posts from entrepreneur subreddits today:
-
-${topPosts.map((p, i) => `[${i + 1}] r/${p.subreddit} (${p.score} upvotes)
-Title: "${p.title}"
-Body: "${p.selftext}"
-`).join("\n")}
-
-Extract exactly 5 distinct, actionable side hustle or career income opportunities from these posts. Each should be something a solo operator can start in under 2 weeks with minimal capital.
-
-Return a JSON object with a single key "ideas" containing an array of exactly 5 objects with this structure:
-{
-  "id": "reddit-<index>",
-  "title": "Clear, specific opportunity title",
-  "category": "one of: SaaS Opportunity | Local Agency | Freelance | Media | Digital Product | Career Leverage",
-  "author": "r/<subreddit> (upvotes upvotes)",
-  "difficulty": "one of: Low | Medium | High",
-  "timeline": "e.g. 48h to first $ | 1 week | 2 weeks",
-  "metrics": "specific revenue/outcome target e.g. $2k/mo with 10 clients",
-  "summary": "2-3 sentence pitch. What the opportunity is and why it's high signal right now.",
-  "steps": ["Step 1", "Step 2", "Step 3", "Step 4"],
-  "tests": ["One cheap 48h validation experiment with a measurable target"]
-}`;
-
-  try {
-    const text = await aiChat(prompt);
-    const parsed = parseJson(text);
-    const ideas = Array.isArray(parsed) ? parsed : parsed.ideas ?? [];
-    console.log(`[Scraper] Got ${ideas.length} ideas from Claude`);
-    return ideas.slice(0, 5);
-  } catch (e) {
-    console.error("[Scraper] Claude parse failed:", e);
-  }
-
-  // Fallback: convert top 5 posts to basic playbook format
-  return topPosts.slice(0, 5).map((p, i) => ({
-    id: `reddit-${i}`,
-    title: p.title.slice(0, 80),
-    category: "Side Hustle",
-    author: `r/${p.subreddit} (${p.score} upvotes)`,
-    difficulty: "Medium",
-    timeline: "1-2 weeks",
-    metrics: "Validate in 48h",
-    summary: p.selftext.slice(0, 200),
-    steps: ["Research the opportunity", "Find 10 potential clients or customers", "Send outreach", "Close first deal"],
-    tests: ["DM 10 people about this and measure response rate"],
-  }));
-}
-
-async function runDailyScrape() {
-  const ideas = await scrapeRedditIdeas();
-  await saveDailyCache(ideas);
-  console.log(`[Scraper] Saved ${ideas.length} ideas for ${todayStr()}`);
-}
-
-// Cron + startup scrape only in non-Vercel environments
-if (!process.env.VERCEL) {
-  loadDailyCache().then(cached => {
-    if (!cached) {
-      runDailyScrape().catch(e => console.error("[Scraper] Startup scrape failed:", e));
-    } else {
-      console.log(`[Scraper] Cache fresh for ${todayStr()}, skipping startup scrape`);
-    }
-  });
-
-  cron.schedule("0 6 * * *", () => {
-    console.log("[Cron] Daily idea scrape triggered");
-    runDailyScrape().catch(e => console.error("[Cron] Scrape failed:", e));
-  });
-}
-
-// ----------------------------------------------------
-// API: Get today's 5 daily ideas
-// ----------------------------------------------------
-app.get("/api/daily-ideas", async (req, res) => {
-  // 1. Try today's Supabase cache
-  const cache = await loadDailyCache();
-  if (cache && Array.isArray(cache.ideas) && cache.ideas.length > 0) {
-    return res.json({ date: todayStr(), ideas: cache.ideas, fresh: true });
-  }
-
-  // No data for today — fire a background scrape on local dev so next reload has fresh data
-  if (!process.env.VERCEL) {
-    runDailyScrape().catch(e => console.error("[Auto-scrape]", e));
-  }
-
-  // 2. Try most recent scraped data from last 7 days
-  const { data: recent } = await supabase
-    .from("daily_ideas")
-    .select("ideas, date")
-    .order("date", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (recent && Array.isArray(recent.ideas) && recent.ideas.length > 0) {
-    return res.json({ date: recent.date as string, ideas: recent.ideas, fresh: false });
-  }
-
-  // 3. No Supabase data at all — return hardcoded fallback
-  return res.json({ date: todayStr(), ideas: CODEX_PLAYBOOKS.slice(0, 5), fresh: false });
+  const { error } = await supabase.from("newsletter").upsert(
+    { email: email.toLowerCase().trim(), source: source || "unknown", subscribed_at: new Date().toISOString() },
+    { onConflict: "email", ignoreDuplicates: true }
+  );
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
 });
 
 // ----------------------------------------------------
-// API: Manually trigger a scrape (admin/dev + Vercel Cron)
-// Vercel Cron sends GET; manual refresh button sends POST — handle both.
+// Daily Ideas — manually curated, updated by the team
+// To update: edit DAILY_IDEAS below and push to GitHub.
 // ----------------------------------------------------
-async function handleScrape(req: any, res: any) {
-  try {
-    await runDailyScrape();
-    const cache = await loadDailyCache();
-    res.json({ ok: true, date: cache?.date, count: Array.isArray(cache?.ideas) ? cache.ideas.length : 0 });
-  } catch (e: any) {
-    res.status(500).json({ ok: false, error: e?.message });
-  }
-}
-app.get("/api/scrape-ideas", handleScrape);
-app.post("/api/scrape-ideas", handleScrape);
+
+const DAILY_IDEAS = [
+  {
+    id: "idea-001",
+    title: "Niche SEO Tool for Specific Industries",
+    category: "SaaS Opportunity",
+    author: "Obsession OS · Jul 10",
+    difficulty: "Medium",
+    timeline: "2 weeks",
+    metrics: "$49–99/mo · 250 customers = $12k–$24k MRR",
+    summary: "Large SEO tools (Ahrefs, Semrush) are bloated and expensive for small operators. A simplified rank tracker + keyword research tool laser-focused on one vertical (local plumbers, dental practices, Shopify stores) gets faster traction because the positioning is specific and the customer is underserved.",
+    steps: [
+      "Pick one vertical you understand — find 50 people actively spending on SEO already.",
+      "MVP: Notion + Typeform for initial validation, then Framer landing page + minimal dashboard.",
+      "Integrate SerpAPI or DataForSEO for rank tracking at $0.002/query.",
+      "Launch with a free 14-day trial, charge $49/mo — target 250 customers in 12 months.",
+    ],
+    tests: [
+      "Post in a subreddit or FB group for your target vertical: 'I'm building a rank tracker specifically for [dentists / plumbers / etc]. Would you pay $49/mo? Drop a 👍 if yes.' Aim for 20+ positive signals before building.",
+    ],
+  },
+  {
+    id: "idea-002",
+    title: "Testimonial & Review Management Tool for SaaS",
+    category: "SaaS Opportunity",
+    author: "Obsession OS · Jul 10",
+    difficulty: "Easy",
+    timeline: "1 week MVP",
+    metrics: "$29–99/mo · low competition vs Testimonial.to",
+    summary: "Every SaaS founder knows they need social proof but collecting, managing, and displaying testimonials is annoyingly manual. Products like Testimonial.to already charge $29–$99/mo — this space has validated demand. A tighter, more automated version focused on B2B SaaS wins on UX.",
+    steps: [
+      "Build a Stripe Checkout integration to create accounts and set up billing.",
+      "Create an embeddable testimonial widget (iframe or web component) with one line of code.",
+      "Add automated collection flows — email drip after trial ends asking for a review.",
+      "Layer in video testimonial capture via Loom API or native recording.",
+    ],
+    tests: [
+      "DM 20 indie hackers or SaaS founders on X: 'I built a tool that auto-collects testimonials after trial ends and embeds them in <5 min. Want early access for free?' Measure conversion to signup.",
+    ],
+  },
+  {
+    id: "idea-003",
+    title: "Micro-Influencer Marketplace for Local Businesses",
+    category: "Digital Product",
+    author: "Obsession OS · Jul 10",
+    difficulty: "Medium",
+    timeline: "2 weeks",
+    metrics: "10% margin on each deal",
+    summary: "Big influencer platforms (AspireIQ, Grin) are too expensive for local businesses. Niche creators with 1K–50K followers are highly trusted by tight communities, and small businesses can't easily access them. A simple matching platform takes 10% per deal and scales without headcount.",
+    steps: [
+      "Build a creator directory with Airtable — scrape public IG/TikTok accounts in your city or niche.",
+      "Let businesses post a brief; manually match with 3 creators and charge a finder's fee.",
+      "Use Calendly for intro bookings; handle contract templates via DocuSign or Notion.",
+      "Once you hit $2k/mo in deals, invest in automating the matching layer.",
+    ],
+    tests: [
+      "List 10 local creators on an Airtable-powered page. DM 15 local restaurant/retail owners offering a free first creator collab to see how fast they convert.",
+    ],
+  },
+  {
+    id: "idea-004",
+    title: "Vertical-Specific Billing & Invoicing for Freelancers",
+    category: "SaaS Opportunity",
+    author: "Obsession OS · Jul 10",
+    difficulty: "Easy",
+    timeline: "48h to first $",
+    metrics: "$15–49/mo per user · high retention",
+    summary: "Generic tools like Wave and FreshBooks exist but lack industry-specific features. A billing tool built for freelance video editors (project-based milestones, revision tracking, B-roll licensing fees) or designers (mood board approvals linked to invoices) wins because it speaks the language of the job.",
+    steps: [
+      "Pick one freelance type you've worked alongside — understand their exact billing pain.",
+      "Use Lemon Squeezy for payments + a simple Next.js dashboard for invoice creation.",
+      "Add one killer niche feature: e.g. 'auto-attach contract PDF to first invoice' for designers.",
+      "Record a Loom demo showing the 3-click invoice flow and post it in freelancer communities.",
+    ],
+    tests: [
+      "Post in a freelancer Discord or Facebook group: 'I'm building invoicing software made for [video editors / copywriters]. What's the #1 thing generic tools get wrong?' Identify 3 pain points, then DM the people who replied most passionately.",
+    ],
+  },
+  {
+    id: "idea-005",
+    title: "AI Content Idea Generator for X/Twitter",
+    category: "SaaS Opportunity",
+    author: "Obsession OS · Jul 10",
+    difficulty: "Easy",
+    timeline: "1 week",
+    metrics: "$29–59/mo · X is the #1 distro channel for indie hackers",
+    summary: "X is the primary distribution channel for indie hackers, traders, and creators — but no focused tool exists to monitor trending hashtags, competitor accounts, and niche signals, then auto-generate scored content ideas. The TAM is anyone trying to grow on X with a business model behind it.",
+    steps: [
+      "Set up a cron job to pull trending hashtags and top tweets in a user-defined niche via the X API.",
+      "Feed them into Claude to generate 5 content angle ideas with predicted engagement score.",
+      "Build a simple dashboard: user sets their niche, sees a daily 'content brief' every morning.",
+      "Upsell: auto-scheduling, A/B testing hooks, reply monitoring.",
+    ],
+    tests: [
+      "Post on X: 'I built a tool that watches your niche on X and gives you 5 content ideas every morning. 10 free beta spots. RT to enter.' Track how many sign up vs retweet.",
+    ],
+  },
+];
+
+// ----------------------------------------------------
+// API: Get daily ideas (curated, always available)
+// ----------------------------------------------------
+app.get("/api/daily-ideas", (_req, res) => {
+  res.json({ ideas: DAILY_IDEAS, fresh: true });
+});
 
 // ----------------------------------------------------
 // Vite Dev & Production Client Setup

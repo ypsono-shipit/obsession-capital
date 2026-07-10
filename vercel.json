@@ -5,9 +5,6 @@
   "functions": {
     "api/server.ts": { "maxDuration": 60 }
   },
-  "crons": [
-    { "path": "/api/scrape-ideas", "schedule": "0 6 * * *" }
-  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/server" },
     { "source": "/(.*)", "destination": "/index.html" }

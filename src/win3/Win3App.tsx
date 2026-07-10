@@ -220,12 +220,16 @@ export default function Win3App() {
   const handleDeleteIdea = (id: string) => setIdeas(prev => prev.filter(i => i.id !== id));
 
   const fetchCritique = async (ideaId: string, title: string, category: string, description: string, metricsGoals: string) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
     try {
       const res = await fetch("/api/forge-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({ title, category, description, metricsGoals }),
       });
+      clearTimeout(timer);
       if (res.ok) {
         const data = await res.json();
         setIdeas(prev => prev.map(i => i.id === ideaId
@@ -238,7 +242,10 @@ export default function Win3App() {
           body: JSON.stringify({ critique: data.critique, assumption: data.assumption, experiments: data.experiments, status: "Validation Active" }),
         }).catch(console.error);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      clearTimeout(timer);
+      console.error(e);
+    }
   };
 
   const handleForgeSubmit = (ideaText: string, github: string, bizInfo: string) => {

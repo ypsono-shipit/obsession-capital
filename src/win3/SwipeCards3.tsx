@@ -13,7 +13,6 @@ interface Props {
 export default function SwipeCards3({ onImport, onGoToForge }: Props) {
   const [playbooks, setPlaybooks] = useState<CodexPlaybook[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scraping, setScraping] = useState(false);
   const [cacheDate, setCacheDate] = useState("");
 
   const [swipedIds, setSwipedIds] = useState<string[]>([]);
@@ -54,20 +53,11 @@ export default function SwipeCards3({ onImport, onGoToForge }: Props) {
     }
   };
 
-  const triggerScrape = async () => {
-    setScraping(true);
-    try {
-      await fetch("/api/scrape-ideas", { method: "POST" });
-      // Clear cache so we load the fresh results
-      localStorage.removeItem(CACHE_KEY);
-      setSwipedIds([]);
-      setExpandedId(null);
-      await loadIdeas();
-    } catch (e) {
-      console.error("Scrape failed:", e);
-    } finally {
-      setScraping(false);
-    }
+  const refreshFeed = async () => {
+    localStorage.removeItem(CACHE_KEY);
+    setSwipedIds([]);
+    setExpandedId(null);
+    await loadIdeas();
   };
 
   useEffect(() => { loadIdeas(); }, []);
@@ -102,13 +92,12 @@ export default function SwipeCards3({ onImport, onGoToForge }: Props) {
           <div className="text-[9px] font-mono text-neutral-600 uppercase tracking-widest">Today's feed · 5 ideas · {cacheDate || TODAY}</div>
         </div>
         <button
-          onClick={triggerScrape}
-          disabled={scraping || loading}
+          onClick={refreshFeed}
+          disabled={loading}
           className="border border-neutral-800 bg-neutral-950 text-neutral-400 hover:text-white hover:border-neutral-500 font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40"
-          title="Scrape Reddit now for fresh ideas"
         >
-          <RefreshCw className={`w-3 h-3 ${scraping ? "animate-spin" : ""}`} />
-          {scraping ? "Scraping Reddit..." : "Refresh Feed"}
+          <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />
+          Refresh Feed
         </button>
       </div>
 

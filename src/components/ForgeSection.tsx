@@ -48,13 +48,15 @@ export default function ForgeSection({ ideas, onAddIdea, onUpdateIdea, onDeleteI
     setShowAddForm(false);
   };
 
-  // Run server-side Gemini red-team feedback
   const handleRedTeam = async (idea: ForgeIdea) => {
     setLoadingFeedbackId(idea.id);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
     try {
       const response = await fetch("/api/forge-feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           title: idea.title,
           category: idea.category,
@@ -62,7 +64,7 @@ export default function ForgeSection({ ideas, onAddIdea, onUpdateIdea, onDeleteI
           metricsGoals: idea.metricsGoals,
         }),
       });
-
+      clearTimeout(timer);
       if (response.ok) {
         const data = await response.json();
         onUpdateIdea(idea.id, {
@@ -71,10 +73,9 @@ export default function ForgeSection({ ideas, onAddIdea, onUpdateIdea, onDeleteI
           experiments: data.experiments,
           status: "Validation Active",
         });
-      } else {
-        console.error("Failed to fetch red-team advice");
       }
     } catch (err) {
+      clearTimeout(timer);
       console.error("Error red-teaming idea:", err);
     } finally {
       setLoadingFeedbackId(null);

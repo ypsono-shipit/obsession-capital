@@ -30,6 +30,7 @@ export default function Win3App() {
     return name && hustle && email ? { name, hustle, email } : null;
   });
   const [tab, setTab] = useState<Tab>("forge");
+  const [showPathModal, setShowPathModal] = useState(false);
   const [metric, setMetric] = useState<MetricConfig>(() => {
     const s = localStorage.getItem("obsession_metric");
     if (s) { try { return JSON.parse(s); } catch { /* */ } }
@@ -363,6 +364,7 @@ export default function Win3App() {
           localStorage.setItem("w3_email", p.email);
           setProfile(p);
           setShowLanding(false);
+          setShowPathModal(true);
           fetch("/api/profile", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -377,6 +379,38 @@ export default function Win3App() {
 
   return (
     <div className="h-screen bg-[#070707] text-[#d1d1d1] font-mono text-xs flex flex-col selection:bg-white selection:text-black">
+
+      {/* Path selection modal */}
+      {showPathModal && (
+        <div className="fixed inset-0 z-50 bg-[#070707]/95 flex items-center justify-center p-6">
+          <div className="w-full max-w-lg">
+            <div className="mb-8 text-center">
+              <div className="text-[9px] font-mono text-[#555] uppercase tracking-widest mb-2">Welcome back{profile?.name ? `, ${profile.name}` : ""}</div>
+              <h2 className="text-white font-mono text-xl font-light">What brings you here today?</h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => { setTab("forge"); setShowPathModal(false); }}
+                className="group border border-[#333] bg-[#0a0a0a] p-6 text-left hover:border-white transition cursor-pointer"
+              >
+                <div className="text-2xl mb-3">⚡</div>
+                <div className="text-white font-mono text-sm font-bold mb-1 group-hover:text-white">I have an idea</div>
+                <div className="text-[#555] font-mono text-[10px] leading-relaxed group-hover:text-neutral-400 transition">Forge it, pressure-test it, and build a plan of attack</div>
+              </button>
+
+              <button
+                onClick={() => { setTab("ideas"); setShowPathModal(false); }}
+                className="group border border-[#333] bg-[#0a0a0a] p-6 text-left hover:border-white transition cursor-pointer"
+              >
+                <div className="text-2xl mb-3">🔍</div>
+                <div className="text-white font-mono text-sm font-bold mb-1 group-hover:text-white">I want to explore</div>
+                <div className="text-[#555] font-mono text-[10px] leading-relaxed group-hover:text-neutral-400 transition">Browse today's high-signal opportunities from the field</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Wizard overlay */}
       {wizardIdea && (

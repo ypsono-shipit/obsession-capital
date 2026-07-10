@@ -413,6 +413,26 @@ app.post("/api/profile", async (req, res) => {
   res.json({ ok: true });
 });
 
+// Profile fetch (includes goals)
+app.get("/api/profile", async (req, res) => {
+  const { email } = req.query as { email: string };
+  if (!email) return res.status(400).json({ error: "email required" });
+  const { data, error } = await supabase.from("profiles").select("*").eq("email", email).single();
+  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
+  res.json(data || {});
+});
+
+// Profile goals update
+app.patch("/api/profile", async (req, res) => {
+  const { email, weekly_goal, long_term_goal } = req.body;
+  if (!email) return res.status(400).json({ error: "email required" });
+  const { error } = await supabase.from("profiles")
+    .update({ weekly_goal, long_term_goal, updated_at: new Date().toISOString() })
+    .eq("email", email);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
 // Ideas
 app.get("/api/ideas", async (req, res) => {
   const { email } = req.query as { email: string };

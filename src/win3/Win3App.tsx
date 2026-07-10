@@ -29,12 +29,16 @@ export default function Win3App() {
     const email = localStorage.getItem("w3_email");
     return name && hustle && email ? { name, hustle, email } : null;
   });
-  const [tab, setTab] = useState<Tab>("scoreboard");
-  const [metric] = useState<MetricConfig>(() => {
+  const [tab, setTab] = useState<Tab>("forge");
+  const [metric, setMetric] = useState<MetricConfig>(() => {
     const s = localStorage.getItem("obsession_metric");
     if (s) { try { return JSON.parse(s); } catch { /* */ } }
     return DEFAULT_METRIC;
   });
+  const [weeklyGoal, setWeeklyGoal] = useState(() => Number(localStorage.getItem("w3_weekly_goal") || 0));
+  const [longTermGoal, setLongTermGoal] = useState(() => localStorage.getItem("w3_long_term_goal") || "");
+  const [editingGoals, setEditingGoals] = useState(() => !Number(localStorage.getItem("w3_weekly_goal")));
+  const [goalDraft, setGoalDraft] = useState({ weekly: 0, longTerm: "" });
   const [logs, setLogs] = useState<DailyLog[]>(() => {
     const s = localStorage.getItem("obsession_logs");
     if (s) { try { return JSON.parse(s); } catch { /* */ } }
@@ -88,16 +92,39 @@ export default function Win3App() {
 
   const handleLogout = () => {
     ["w3_name", "w3_hustle", "w3_email", "w3_ideas", "w3_goal", "w3_task_list",
-     `w3_checks_${TODAY}`].forEach(k => localStorage.removeItem(k));
+     "w3_weekly_goal", "w3_long_term_goal", `w3_checks_${TODAY}`].forEach(k => localStorage.removeItem(k));
     setProfile(null);
     setIdeas([]);
     setLogs([]);
     setActiveGoal("");
     setActiveTasks([]);
     setTaskChecks([]);
+    setWeeklyGoal(0);
+    setLongTermGoal("");
+    setEditingGoals(true);
     setWizardIdeaId(null);
     setShowProfileMenu(false);
+    setTab("forge");
     setShowLanding(true);
+  };
+
+  const handleSaveGoals = () => {
+    const wg = goalDraft.weekly;
+    const lt = goalDraft.longTerm;
+    setWeeklyGoal(wg);
+    setLongTermGoal(lt);
+    setMetric(prev => ({ ...prev, weeklyGoal: wg }));
+    setEditingGoals(false);
+    localStorage.setItem("w3_weekly_goal", String(wg));
+    localStorage.setItem("w3_long_term_goal", lt);
+    localStorage.setItem("obsession_metric", JSON.stringify({ ...metric, weeklyGoal: wg }));
+    if (profile) {
+      fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, weekly_goal: wg, long_term_goal: lt }),
+      }).catch(console.error);
+    }
   };
 
   // Load all user data from Supabase when profile is known
@@ -109,7 +136,19 @@ export default function Win3App() {
       fetch(`/api/logs?email=${email}`).then(r => r.json()),
       fetch(`/api/mission?email=${email}`).then(r => r.json()),
       fetch(`/api/task-checks?email=${email}&date=${TODAY}`).then(r => r.json()),
-    ]).then(([remoteIdeas, remoteLogs, mission, checksData]) => {
+      fetch(`/api/profile?email=${email}`).then(r => r.json()),
+    ]).then(([remoteIdeas, remoteLogs, mission, checksData, profileData]) => {
+      if (profileData?.weekly_goal) {
+        const wg = Number(profileData.weekly_goal);
+        setWeeklyGoal(wg);
+        setMetric(prev => ({ ...prev, weeklyGoal: wg }));
+        setEditingGoals(false);
+        localStorage.setItem("w3_weekly_goal", String(wg));
+      }
+      if (profileData?.long_term_goal) {
+        setLongTermGoal(profileData.long_term_goal);
+        localStorage.setItem("w3_long_term_goal", profileData.long_term_goal);
+      }
       if (Array.isArray(remoteIdeas) && remoteIdeas.length > 0) {
         const mapped = remoteIdeas.map((i: any) => ({
           id: i.id, title: i.title, category: i.category,
@@ -372,7 +411,7 @@ export default function Win3App() {
           <div className="flex gap-4 text-right">
             <div className="border-l border-neutral-800 pl-4">
               <div className="text-[9px] text-[#555] uppercase">This Week</div>
-              <div className="text-emerald-400 font-bold">${weeklySum} / ${metric.weeklyGoal}</div>
+              <div className="text-emerald-400 font-bold">${weeklySum}{weeklyGoal > 0 ? ` / $${weeklyGoal.toLocaleString()}` : ""}</div>
             </div>
             <div className="border-l border-neutral-800 pl-4">
               <div className="text-[9px] text-[#555] uppercase">Month Total</div>
@@ -417,6 +456,76 @@ export default function Win3App() {
         {tab === "scoreboard" && (
           <div className="space-y-6 max-w-5xl mx-auto">
 
+            {/* Income Targets */}
+            {editingGoals ? (
+              <div className="relative border border-emerald-500/40 p-5 bg-[#0a0a0a]">
+                <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                  Set Your Targets
+                </div>
+                <div className="mt-1 space-y-4">
+                  <div>
+                    <div className="text-[9px] font-mono text-[#555] uppercase tracking-widest mb-1.5">Weekly Income Goal</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-neutral-500 font-mono text-sm">$</span>
+                      <input
+                        autoFocus
+                        type="number"
+                        min={0}
+                        value={goalDraft.weekly || ""}
+                        onChange={e => setGoalDraft(p => ({ ...p, weekly: Number(e.target.value) }))}
+                        className="flex-1 bg-[#0d0d0d] border border-[#333] px-3 py-2 text-white font-mono text-sm outline-none focus:border-neutral-500 max-w-xs"
+                        placeholder="2000"
+                      />
+                      <span className="text-[10px] font-mono text-[#444] uppercase tracking-widest">/week</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] font-mono text-[#555] uppercase tracking-widest mb-1.5">Long-Term Goal</div>
+                    <input
+                      type="text"
+                      value={goalDraft.longTerm}
+                      onChange={e => setGoalDraft(p => ({ ...p, longTerm: e.target.value }))}
+                      onKeyDown={e => { if (e.key === "Enter" && goalDraft.weekly > 0) handleSaveGoals(); }}
+                      className="w-full bg-[#0d0d0d] border border-[#333] px-3 py-2 text-white font-mono text-xs outline-none focus:border-neutral-500"
+                      placeholder="e.g. Hit $10k MRR by Q4 2026"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    {weeklyGoal > 0 && (
+                      <button onClick={() => setEditingGoals(false)} className="text-[10px] font-mono text-[#444] uppercase tracking-widest hover:text-white transition cursor-pointer">
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSaveGoals}
+                      disabled={!goalDraft.weekly}
+                      className="ml-auto bg-emerald-500 text-black font-mono text-[10px] font-bold px-5 py-2 uppercase tracking-widest hover:bg-emerald-400 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Lock in targets →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : weeklyGoal > 0 && (
+              <div className="relative border border-[#333] p-4 bg-[#0a0a0a]">
+                <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
+                  Income Targets
+                </div>
+                <div className="mt-1 flex items-center justify-between">
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-white font-mono font-bold text-sm">${weeklyGoal.toLocaleString()}<span className="text-[#555] font-normal text-xs">/wk</span></span>
+                    {longTermGoal && <span className="text-neutral-400 font-mono text-xs">· {longTermGoal}</span>}
+                  </div>
+                  <button
+                    onClick={() => { setGoalDraft({ weekly: weeklyGoal, longTerm: longTermGoal }); setEditingGoals(true); }}
+                    className="text-[9px] font-mono text-[#444] uppercase tracking-widest hover:text-white transition cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Active Mission */}
             {activeGoal && activeTasks.length > 0 && (
               <div className="relative border border-[#333] p-5 bg-[#0a0a0a]">
@@ -425,7 +534,6 @@ export default function Win3App() {
                 </div>
                 <div className="mt-1 space-y-4">
                   <p className="text-xs font-mono text-white leading-relaxed">{activeGoal}</p>
-
                   <div className="space-y-2.5">
                     {activeTasks.map((task, i) => (
                       <label key={i} onClick={() => toggleTask(i)} className="flex items-start gap-3 cursor-pointer group">
@@ -442,15 +550,11 @@ export default function Win3App() {
                       </label>
                     ))}
                   </div>
-
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[9px] font-mono text-[#444] uppercase tracking-widest">
                       {taskChecks.filter(Boolean).length}/{activeTasks.length} done today
                     </span>
-                    <button
-                      onClick={() => { setTab("pod"); }}
-                      className="text-[9px] font-mono text-[#444] uppercase tracking-widest hover:text-white transition cursor-pointer"
-                    >
+                    <button onClick={() => setTab("pod")} className="text-[9px] font-mono text-[#444] uppercase tracking-widest hover:text-white transition cursor-pointer">
                       View Pod →
                     </button>
                   </div>

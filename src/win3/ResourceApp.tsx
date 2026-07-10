@@ -1,285 +1,273 @@
 import React, { useState, useRef, useEffect } from "react";
-import { X, LogOut, User, ArrowRight } from "lucide-react";
+import { X, LogOut, User, ArrowRight, Lock } from "lucide-react";
 import AsciiLanding from "../components/AsciiLanding";
 
-interface ResourceSection {
-  heading: string;
-  items: string[];
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type BlockType = "list" | "code" | "prompt" | "steps";
+
+interface ContentBlock {
+  type: BlockType;
+  label?: string;
+  items?: string[];
+  code?: string;
 }
 
-interface ResourcePack {
-  id: string;
-  category: string;
-  difficulty: "Starter" | "Intermediate" | "Advanced";
+interface Phase {
   title: string;
-  description: string;
-  readTime: string;
-  sections: ResourceSection[];
+  blocks: ContentBlock[];
 }
 
-const RESOURCES: ResourcePack[] = [
-  {
-    id: "validation-48h",
-    category: "Validation",
-    difficulty: "Starter",
-    title: "The 48-Hour Idea Validation Playbook",
-    description: "A zero-cost framework to test whether people will actually pay for your idea before you build anything.",
-    readTime: "8 min read",
-    sections: [
-      {
-        heading: "Step 1 — Write the one-liner",
-        items: [
-          "Fill in: 'I help [WHO] achieve [OUTCOME] without [PAIN].'",
-          "If you can't write this in under 30 seconds, your idea isn't clear enough yet.",
-          "Post it to a relevant subreddit or Discord and note how many people ask for more info.",
-        ],
-      },
-      {
-        heading: "Step 2 — Find 10 real humans",
-        items: [
-          "Use Reddit, LinkedIn, or Twitter/X to find people who match your target customer.",
-          "DM them: 'I'm building something for [problem]. Would you do a 10-min call?'",
-          "Target: 3 out of 10 should say yes. If fewer respond, your targeting or messaging is off.",
-        ],
-      },
-      {
-        heading: "Step 3 — Run the problem interview",
-        items: [
-          "Ask: 'Walk me through the last time you dealt with [problem].'",
-          "Never pitch. Just listen. Record the exact words they use.",
-          "Ask: 'What have you tried? What did it cost? What was still broken?'",
-        ],
-      },
-      {
-        heading: "Step 4 — The pre-sale close",
-        items: [
-          "At the end of one interview, say: 'I'm building a solution. Would you pay $X to be a founding user?'",
-          "If they say yes: 'Great — I can take a deposit now to hold your spot.'",
-          "One paid commitment in 48 hours = validated. Zero commitments = back to step 1.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "cold-outreach",
-    category: "Sales",
-    difficulty: "Starter",
-    title: "Cold Outreach Templates That Actually Convert",
-    description: "Proven DM and email scripts for landing your first clients — written to feel human, not like a pitch deck.",
-    readTime: "6 min read",
-    sections: [
-      {
-        heading: "The 3-line DM (LinkedIn / Twitter)",
-        items: [
-          "Line 1: Specific observation about them. ('Saw your post about X — that friction is real.')",
-          "Line 2: What you do in one sentence. ('I help [WHO] fix exactly that.')",
-          "Line 3: Tiny ask. ('Worth a 10-min call this week?')",
-          "Do NOT include your portfolio, website, or pricing in the first message.",
-        ],
-      },
-      {
-        heading: "The cold email (under 80 words)",
-        items: [
-          "Subject: '[Their company] + [specific observation]'",
-          "Body: 'Hi [Name], noticed [specific thing about their business]. Most [role] I talk to struggle with [problem]. I [what you do] — helped [similar company] achieve [result]. Worth a quick call? [Your name]'",
-          "Send at 7–9 AM their timezone. Tuesday–Thursday get the highest reply rates.",
-        ],
-      },
-      {
-        heading: "The follow-up sequence",
-        items: [
-          "Day 3: 'Just bumping this up — still relevant?'",
-          "Day 7: Share a relevant insight, no ask. ('Thought you'd find this useful: [link/stat]')",
-          "Day 14: Final bump. 'Not the right time? No worries — I'll check back in 90 days.'",
-          "Stop after 3 touches. Persistence is good; pestering kills deals.",
-        ],
-      },
-      {
-        heading: "What kills cold outreach",
-        items: [
-          "Opening with 'I hope this finds you well' — delete immediately.",
-          "Attaching a deck or case study on first contact.",
-          "Pitching before you've confirmed the problem exists for them.",
-          "Personalisation that's clearly copy-pasted ('I love your company's work!').",
-        ],
-      },
-    ],
-  },
-  {
-    id: "pricing-first-offer",
-    category: "Revenue",
-    difficulty: "Starter",
-    title: "How to Price Your First Offer",
-    description: "Most first-time founders underprice by 3–5x. This framework helps you set a number that's defensible, profitable, and doesn't make clients distrust you.",
-    readTime: "7 min read",
-    sections: [
-      {
-        heading: "The value-based anchor",
-        items: [
-          "Ask: 'What is this worth to the client if it works perfectly?'",
-          "Price at 10–20% of that value. If your solution saves them $50k, charge $5–10k.",
-          "Never price based on your hours. Price based on their outcome.",
-        ],
-      },
-      {
-        heading: "The three-tier test",
-        items: [
-          "Always present 3 options: Basic / Core / Premium.",
-          "Most clients pick the middle. Price your Core at your real target, not a compromise.",
-          "Premium exists to make Core feel reasonable, not to actually sell.",
-        ],
-      },
-      {
-        heading: "How to handle 'that's too expensive'",
-        items: [
-          "Don't discount immediately. Ask: 'Too expensive compared to what?'",
-          "Reframe to ROI: 'If this works, what's the return over 12 months?'",
-          "Offer a smaller first engagement, not a lower price: 'Start with a pilot at $X.'",
-        ],
-      },
-      {
-        heading: "When to raise prices",
-        items: [
-          "When your close rate is above 70% — you're underpriced.",
-          "Every 3 new clients, test raising 20%.",
-          "If no one has ever said 'that's expensive', you're definitely underpriced.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "90-day-roadmap",
-    category: "Planning",
-    difficulty: "Intermediate",
-    title: "The 90-Day Revenue Roadmap",
-    description: "A week-by-week execution plan to go from zero to your first $2k–$5k month without burning out or building the wrong thing.",
-    readTime: "10 min read",
-    sections: [
-      {
-        heading: "Weeks 1–2 — Nail the problem",
-        items: [
-          "Complete 10 problem interviews. Do not build anything.",
-          "Identify the one problem that comes up in 7 of 10 interviews.",
-          "Write your positioning statement and test it on 5 strangers.",
-        ],
-      },
-      {
-        heading: "Weeks 3–4 — Get one paying customer",
-        items: [
-          "Build nothing. Sell the outcome manually first.",
-          "Send 50 cold DMs using your validated positioning.",
-          "Target: 1 paid commitment at any price by end of week 4.",
-        ],
-      },
-      {
-        heading: "Weeks 5–8 — Deliver and document",
-        items: [
-          "Deliver your first engagement. Take notes on everything you do.",
-          "Build the minimal thing needed to deliver the result (not the full vision).",
-          "Get a testimonial or case study from client 1 before charging client 2 more.",
-        ],
-      },
-      {
-        heading: "Weeks 9–12 — Scale the channel",
-        items: [
-          "Identify where client 1 came from. Double down on that channel only.",
-          "Raise prices for clients 3 and 4.",
-          "By week 12, you should have 2–4 clients and a clear repeatable process.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "reddit-research",
-    category: "Research",
-    difficulty: "Starter",
-    title: "The Reddit Research Method",
-    description: "How to use Reddit to find underserved markets, validate demand, and steal the exact words your customers use to describe their problems.",
-    readTime: "5 min read",
-    sections: [
-      {
-        heading: "Finding the right subreddits",
-        items: [
-          "Start with: r/Entrepreneur, r/smallbusiness, r/sidehustle, r/freelance.",
-          "Search '[your niche] + problems' or '[your niche] + help' to find specific communities.",
-          "Look for communities of 50k–500k members — large enough for signal, small enough to be specific.",
-        ],
-      },
-      {
-        heading: "The pain post scan",
-        items: [
-          "Filter by 'Top - This Month'. Look for posts starting with 'Does anyone else...', 'I'm struggling with...', 'Is there a tool that...'",
-          "Copy the exact phrases people use. These become your marketing copy.",
-          "High upvotes + many comments = high pain. That's your target.",
-        ],
-      },
-      {
-        heading: "Validating demand in comments",
-        items: [
-          "Find posts where someone asks 'does X exist?' and the answer is no.",
-          "Count how many people upvoted or commented 'same problem here'.",
-          "10+ people expressing the same pain = a market. 50+ = a real opportunity.",
-        ],
-      },
-      {
-        heading: "Building a research habit",
-        items: [
-          "Spend 20 minutes 3x per week scanning your target subreddits.",
-          "Keep a swipe file of pain posts in Notion or a Google Doc.",
-          "The person who understands the customer best always wins. This is your competitive edge.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "zero-cost-marketing",
-    category: "Marketing",
-    difficulty: "Intermediate",
-    title: "The $0 Customer Acquisition Stack",
-    description: "How to get your first 10 customers without spending a dollar on ads — using content, communities, and direct outreach.",
-    readTime: "9 min read",
-    sections: [
-      {
-        heading: "Channel 1 — Community seeding",
-        items: [
-          "Join 3 communities where your target customers hang out (Slack, Discord, Reddit, Facebook Groups).",
-          "Spend 2 weeks contributing value before mentioning what you do.",
-          "When someone posts a problem you solve, offer a free 20-min audit in the comments.",
-        ],
-      },
-      {
-        heading: "Channel 2 — Content that converts",
-        items: [
-          "Post one 'how I did X' breakdown per week on LinkedIn or Twitter.",
-          "Show the process, not just the result. Screenshots beat testimonials.",
-          "End every post with: 'DM me if you want help doing this.'",
-        ],
-      },
-      {
-        heading: "Channel 3 — Strategic partnerships",
-        items: [
-          "Find 5 people who serve the same customer but don't compete with you.",
-          "Offer to refer each other. Give them a commission for any client they send.",
-          "One good partner can be worth 20 cold outreach attempts.",
-        ],
-      },
-      {
-        heading: "What to track",
-        items: [
-          "Track: conversations started, calls booked, proposals sent, clients closed.",
-          "If your close rate is high but calls are low, fix your outreach volume.",
-          "If calls are high but close rate is low, fix your sales conversation.",
-        ],
-      },
-    ],
-  },
+interface GuideContent {
+  intro: string;
+  phases: Phase[];
+  quickStart: string[];
+}
+
+// ─── The one live guide ───────────────────────────────────────────────────────
+
+const SECOND_BRAIN_GUIDE: GuideContent = {
+  intro:
+    "This system turns your daily notes into a growing, intelligent knowledge base that actively finds connections, surfaces insights, and compounds over time.",
+
+  phases: [
+    {
+      title: "Phase 1 — Obsidian Setup (Foundation)",
+      blocks: [
+        {
+          type: "steps",
+          label: "Install Obsidian",
+          items: [
+            "Download from obsidian.md",
+            "Create a new vault called Second Brain (or Obsession Brain)",
+          ],
+        },
+        {
+          type: "list",
+          label: "Recommended Plugins (via Community Plugins)",
+          items: [
+            "Dataview — Query and surface connections",
+            "Smart Connections — AI-powered semantic search (very powerful with Claude)",
+            "Templater — Auto-generate daily note templates",
+            "Calendar — Easy daily note access",
+            "Excalidraw — Visual thinking (optional but useful)",
+            "Style Settings + Minimal Theme — Clean dark interface",
+          ],
+        },
+        {
+          type: "code",
+          label: "Create Core Folders",
+          code: `Second Brain/
+├── 00 Inbox/              ← Quick capture (everything goes here first)
+├── 01 Daily Notes/        ← Templated daily logs
+├── 02 Projects/           ← Business ideas, ventures, goals
+├── 03 Areas/              ← Ongoing responsibilities (Health, Finance, Content, etc.)
+├── 04 Resources/          ← Books, articles, notes, insights
+├── 05 Maps of Content/    ← MOCs (big picture overviews)
+└── 06 Archive/            ← Old or completed items`,
+        },
+      ],
+    },
+    {
+      title: "Phase 2 — Daily Capture System",
+      blocks: [
+        {
+          type: "list",
+          label: "Create a Daily Note Template (using Templater)",
+          items: [
+            "Date + Day",
+            "Wins / Key Outputs",
+            "Ideas & Insights",
+            "Things I Read / Watched",
+            "Questions / Open Loops",
+            "Quick Capture (random thoughts)",
+          ],
+        },
+        {
+          type: "list",
+          label: "Daily Habit",
+          items: [
+            "Every evening (or morning), open today's note.",
+            "Dump everything without overthinking — raw thoughts, links, screenshots, voice notes.",
+            "Tag liberally (e.g., #idea, #business, #matcha, #finance).",
+          ],
+        },
+      ],
+    },
+    {
+      title: "Phase 3 — Connect Claude (The Intelligence Layer)",
+      blocks: [
+        {
+          type: "list",
+          label: "Create a Dedicated Claude Project",
+          items: [
+            "Name it: Second Brain or Obsession Brain",
+            "Upload your Obsidian vault (or key folders) as knowledge files when possible.",
+            "Or use the Projects feature + copy-paste important sections.",
+          ],
+        },
+        {
+          type: "prompt",
+          label: "Daily Synthesis Prompt",
+          code: `You are my compounding second brain.
+Review today's daily note and connect it to my existing knowledge base.
+- Summarize key insights
+- Find connections to past ideas, projects, or readings
+- Highlight potential synergies between business ideas and information I've consumed
+- Suggest 2-3 actionable next steps
+- Flag any open loops or contradictions`,
+        },
+        {
+          type: "prompt",
+          label: "Weekly Review Prompt",
+          code: `Perform a weekly synthesis of my notes from the past 7 days.
+Identify emerging patterns, recurring themes, and high-leverage connections across business ideas and research.
+What should I double down on? What should I deprioritize?`,
+        },
+        {
+          type: "prompt",
+          label: "Idea Connection Prompt",
+          code: `Take this new idea/business concept and cross-reference it with everything in my vault.
+What related concepts, past experiments, or external knowledge already exist?
+What synergies or gaps do you see?`,
+        },
+        {
+          type: "steps",
+          label: "Workflow",
+          items: [
+            "End of day → Dump notes into Obsidian",
+            "Run the Daily Synthesis Prompt in Claude (paste today's note + relevant MOCs)",
+            "Claude outputs insights + suggested connections",
+            "Go back to Obsidian and create proper linked notes or MOCs based on Claude's output",
+          ],
+        },
+      ],
+    },
+    {
+      title: "Phase 4 — Make It Compound (Advanced Layer)",
+      blocks: [
+        {
+          type: "list",
+          label: "Build Maps of Content (MOCs)",
+          items: [
+            "Create one MOC per major area (e.g., MOC - Business Ideas, MOC - Matcha Pop-up Strategy)",
+            "Regularly ask Claude to update these MOCs with new connections.",
+          ],
+        },
+        {
+          type: "list",
+          label: "Weekly + Monthly Rituals",
+          items: [
+            "Weekly: Run the weekly synthesis prompt",
+            "Monthly: Ask Claude to review the last 30 days and surface the biggest insights or pattern shifts",
+          ],
+        },
+        {
+          type: "list",
+          label: "Smart Connections + Claude Combo",
+          items: [
+            "Use Obsidian's Smart Connections plugin for instant semantic search.",
+            "Feed the most relevant notes into Claude for deeper reasoning.",
+          ],
+        },
+      ],
+    },
+    {
+      title: "Phase 5 — Pro Tips for Maximum Compounding",
+      blocks: [
+        {
+          type: "list",
+          items: [
+            "Capture ruthlessly — Friction is the enemy. Use quick capture tools (mobile app, voice memos, web clipper).",
+            "Link aggressively — Every time Claude finds a connection, create an actual [[wikilink]] in Obsidian.",
+            "Review outputs — Don't just read Claude's summary. Act on the suggested connections by creating new notes or updating projects.",
+            "Version your thinking — When an idea evolves significantly, create a new note and link it to the old one with dates.",
+            "Privacy note: Keep sensitive financial or personal data out of Claude if needed (use local-only sections).",
+          ],
+        },
+      ],
+    },
+  ],
+
+  quickStart: [
+    "Create the vault + folders",
+    "Install the 4–5 core plugins",
+    "Make a simple daily note template",
+    "Create one Claude Project called 'Second Brain'",
+    "Tonight: Dump everything into today's note and run the Daily Synthesis prompt",
+  ],
+};
+
+// ─── Coming-soon placeholder titles ──────────────────────────────────────────
+
+const COMING_SOON = [
+  { category: "Revenue", title: "The $0 Customer Acquisition Stack" },
+  { category: "Validation", title: "The 48-Hour Idea Validation Playbook" },
+  { category: "Sales", title: "Cold Outreach Templates That Convert" },
+  { category: "Planning", title: "The 90-Day Revenue Roadmap" },
+  { category: "Research", title: "The Reddit Research Method" },
 ];
 
-const DIFFICULTY_COLORS: Record<string, string> = {
-  Starter: "text-emerald-400 bg-emerald-950 border-emerald-900",
-  Intermediate: "text-amber-400 bg-amber-950 border-amber-900",
-  Advanced: "text-rose-400 bg-rose-950 border-rose-900",
-};
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function CodeBlock({ code, label, isPrompt }: { code: string; label?: string; isPrompt?: boolean }) {
+  return (
+    <div className={`border ${isPrompt ? "border-emerald-900 bg-emerald-950/20" : "border-[#222] bg-[#050505]"}`}>
+      {label && (
+        <div className={`border-b ${isPrompt ? "border-emerald-900/60" : "border-[#1a1a1a]"} px-4 py-2.5`}>
+          <span className={`text-[9px] font-mono uppercase tracking-widest ${isPrompt ? "text-emerald-400" : "text-[#555]"}`}>
+            {isPrompt ? "↳ Prompt · " : ""}{label}
+          </span>
+        </div>
+      )}
+      <pre className={`px-4 py-3 font-mono text-[10px] leading-relaxed whitespace-pre-wrap ${isPrompt ? "text-emerald-300" : "text-neutral-400"} overflow-x-auto`}>
+        {code}
+      </pre>
+    </div>
+  );
+}
+
+function GuidePhase({ phase }: { phase: Phase }) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-white font-mono text-sm font-medium border-l-2 border-emerald-500 pl-3">
+        {phase.title}
+      </h3>
+      {phase.blocks.map((block, i) => {
+        if (block.type === "code") {
+          return <CodeBlock key={i} code={block.code!} label={block.label} />;
+        }
+        if (block.type === "prompt") {
+          return <CodeBlock key={i} code={block.code!} label={block.label} isPrompt />;
+        }
+        if (block.type === "list" || block.type === "steps") {
+          return (
+            <div key={i}>
+              {block.label && (
+                <div className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-2">
+                  {block.label}
+                </div>
+              )}
+              <ul className="space-y-2">
+                {block.items!.map((item, j) => (
+                  <li key={j} className="flex gap-2.5">
+                    <span className="text-[#444] font-mono flex-shrink-0 mt-0.5">
+                      {block.type === "steps" ? `${j + 1}.` : "→"}
+                    </span>
+                    <span className="text-neutral-300 font-mono text-[11px] leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return null;
+      })}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ResourceApp() {
   const [profile, setProfile] = useState<{ name: string; hustle: string; email: string } | null>(() => {
@@ -289,11 +277,9 @@ export default function ResourceApp() {
     return name && hustle && email ? { name, hustle, email } : null;
   });
   const [showLanding, setShowLanding] = useState(() => !localStorage.getItem("w3_email"));
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-
-  const openPack = RESOURCES.find(r => r.id === openId) ?? null;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -331,43 +317,53 @@ export default function ResourceApp() {
   return (
     <div className="min-h-screen bg-[#070707] text-[#d1d1d1] font-mono text-xs">
 
-      {/* Resource detail overlay */}
-      {openPack && (
-        <div className="fixed inset-0 z-50 bg-[#070707]/96 overflow-y-auto">
+      {/* Full guide overlay */}
+      {guideOpen && (
+        <div className="fixed inset-0 z-50 bg-[#070707]/97 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-12">
+
+            {/* Guide header */}
             <div className="flex items-start justify-between mb-8">
               <div>
-                <div className={`inline-block text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border mb-3 ${DIFFICULTY_COLORS[openPack.difficulty]}`}>
-                  {openPack.category} · {openPack.difficulty}
+                <div className="inline-block text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border mb-3 text-emerald-400 bg-emerald-950 border-emerald-900">
+                  Productivity · Starter
                 </div>
-                <h2 className="text-white font-mono text-lg font-light leading-snug">{openPack.title}</h2>
-                <p className="text-neutral-500 font-mono text-[10px] mt-1">{openPack.readTime}</p>
+                <h2 className="text-white font-mono text-lg font-light leading-snug">
+                  Compounding Second Brain:<br />Claude Code + Obsidian
+                </h2>
+                <p className="text-neutral-500 font-mono text-[10px] mt-1">20 min read · 5 phases</p>
               </div>
-              <button onClick={() => setOpenId(null)} className="text-[#444] hover:text-white transition cursor-pointer ml-6 flex-shrink-0">
+              <button
+                onClick={() => setGuideOpen(false)}
+                className="text-[#444] hover:text-white transition cursor-pointer ml-6 flex-shrink-0"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {/* Intro */}
             <p className="text-neutral-400 font-mono text-xs leading-relaxed mb-8 border-l-2 border-[#333] pl-4">
-              {openPack.description}
+              {SECOND_BRAIN_GUIDE.intro}
             </p>
 
-            <div className="space-y-6">
-              {openPack.sections.map((section, i) => (
-                <div key={i} className="border border-[#222] bg-[#0a0a0a]">
-                  <div className="border-b border-[#1a1a1a] px-4 py-3">
-                    <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest">{section.heading}</div>
-                  </div>
-                  <ul className="divide-y divide-[#111]">
-                    {section.items.map((item, j) => (
-                      <li key={j} className="px-4 py-3 flex gap-3">
-                        <span className="text-[#333] flex-shrink-0 font-mono">→</span>
-                        <span className="text-neutral-300 font-mono text-xs leading-relaxed">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            {/* Phases */}
+            <div className="space-y-10">
+              {SECOND_BRAIN_GUIDE.phases.map((phase, i) => (
+                <GuidePhase key={i} phase={phase} />
               ))}
+
+              {/* Quick Start */}
+              <div className="border border-white/10 bg-white/[0.02] p-5 space-y-3">
+                <h3 className="text-white font-mono text-sm font-medium">Quick Start — Do This Today</h3>
+                <ol className="space-y-2">
+                  {SECOND_BRAIN_GUIDE.quickStart.map((step, i) => (
+                    <li key={i} className="flex gap-2.5">
+                      <span className="text-emerald-500 font-mono flex-shrink-0 font-bold">{i + 1}.</span>
+                      <span className="text-neutral-200 font-mono text-[11px] leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </div>
 
             <div className="mt-10 pt-6 border-t border-[#1a1a1a]">
@@ -427,47 +423,76 @@ export default function ResourceApp() {
         <div className="mb-8">
           <div className="text-[9px] font-mono text-[#444] uppercase tracking-widest mb-2">Resource Library</div>
           <h1 className="text-white font-mono text-xl font-light">Playbooks & Frameworks</h1>
-          <p className="text-neutral-600 font-mono text-[10px] mt-1">{RESOURCES.length} packs · Updated regularly</p>
+          <p className="text-neutral-600 font-mono text-[10px] mt-1">1 live · 5 coming soon</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {RESOURCES.map(pack => (
-            <button
-              key={pack.id}
-              onClick={() => setOpenId(pack.id)}
-              className="group border border-[#222] bg-[#0a0a0a] hover:border-neutral-600 transition text-left flex flex-col h-[220px] cursor-pointer"
-            >
-              {/* Card header */}
-              <div className="border-b border-[#1a1a1a] px-4 py-3 flex items-center justify-between">
-                <span className={`text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border ${DIFFICULTY_COLORS[pack.difficulty]}`}>
-                  {pack.category}
-                </span>
-                <span className="text-[9px] font-mono text-[#444]">{pack.readTime}</span>
+
+          {/* ── Live card ── */}
+          <button
+            onClick={() => setGuideOpen(true)}
+            className="group border border-[#333] bg-[#0a0a0a] hover:border-neutral-500 transition text-left flex flex-col h-[220px] cursor-pointer"
+          >
+            <div className="border-b border-[#1a1a1a] px-4 py-3 flex items-center justify-between">
+              <span className="text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border text-emerald-400 bg-emerald-950 border-emerald-900">
+                Productivity
+              </span>
+              <span className="text-[9px] font-mono text-[#444]">20 min read</span>
+            </div>
+            <div className="flex-1 px-4 py-4 flex flex-col justify-between">
+              <div>
+                <h3 className="text-white font-mono text-sm font-light leading-snug mb-2">
+                  Compounding Second Brain:<br />Claude Code + Obsidian
+                </h3>
+                <p className="text-neutral-600 font-mono text-[10px] leading-relaxed line-clamp-2">
+                  Turn your daily notes into a growing, intelligent knowledge base that actively finds connections and compounds over time.
+                </p>
               </div>
-
-              {/* Card body */}
-              <div className="flex-1 px-4 py-4 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-white font-mono text-sm font-light leading-snug group-hover:text-white mb-2">
-                    {pack.title}
-                  </h3>
-                  <p className="text-neutral-600 font-mono text-[10px] leading-relaxed line-clamp-2">
-                    {pack.description}
-                  </p>
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="w-1.5 h-1.5 bg-emerald-800 group-hover:bg-emerald-600 transition" />
+                  ))}
                 </div>
+                <span className="text-[9px] font-mono text-emerald-500 group-hover:text-emerald-300 transition uppercase tracking-widest flex items-center gap-1">
+                  Open <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          </button>
 
-                <div className="flex items-center justify-between mt-3">
-                  <div className="flex gap-1.5">
-                    {pack.sections.map((_, i) => (
-                      <div key={i} className="w-1.5 h-1.5 bg-[#333] group-hover:bg-neutral-600 transition" />
+          {/* ── Coming soon cards ── */}
+          {COMING_SOON.map((item, i) => (
+            <div
+              key={i}
+              className="relative border border-[#1a1a1a] bg-[#0a0a0a] flex flex-col h-[220px] overflow-hidden"
+            >
+              {/* Blurred content */}
+              <div className="flex-1 flex flex-col blur-sm pointer-events-none select-none opacity-40">
+                <div className="border-b border-[#1a1a1a] px-4 py-3 flex items-center justify-between">
+                  <span className="text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border text-neutral-500 bg-neutral-950 border-neutral-900">
+                    {item.category}
+                  </span>
+                  <span className="text-[9px] font-mono text-[#333]">— min read</span>
+                </div>
+                <div className="flex-1 px-4 py-4 flex flex-col justify-between">
+                  <h3 className="text-neutral-500 font-mono text-sm font-light leading-snug">{item.title}</h3>
+                  <div className="flex gap-1.5 mt-auto">
+                    {[1, 2, 3, 4].map(j => (
+                      <div key={j} className="w-1.5 h-1.5 bg-[#222]" />
                     ))}
                   </div>
-                  <span className="text-[9px] font-mono text-[#444] group-hover:text-white transition uppercase tracking-widest flex items-center gap-1">
-                    Open <ArrowRight className="w-3 h-3" />
-                  </span>
                 </div>
               </div>
-            </button>
+
+              {/* Coming soon overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex items-center gap-2 bg-[#0a0a0a]/80 border border-[#333] px-3 py-1.5">
+                  <Lock className="w-3 h-3 text-[#555]" />
+                  <span className="text-[9px] font-mono text-[#555] uppercase tracking-widest">Coming Soon</span>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>

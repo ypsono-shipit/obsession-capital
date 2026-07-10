@@ -532,6 +532,25 @@ app.post("/api/task-checks", async (req, res) => {
 });
 
 // ----------------------------------------------------
+// API: Public operator list (no emails exposed)
+// ----------------------------------------------------
+app.get("/api/operators", async (req, res) => {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("name, hustle, updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  if (error) return res.status(500).json({ error: error.message });
+  const operators = (data || []).map((p: any) => ({
+    name: p.name || "Operator",
+    hustle: p.hustle || "—",
+    status: p.updated_at >= sevenDaysAgo ? "ACTIVE" : "STANDBY",
+  }));
+  res.json(operators);
+});
+
+// ----------------------------------------------------
 // Daily Ideas Cache (Reddit Scraper — Supabase backed)
 // ----------------------------------------------------
 

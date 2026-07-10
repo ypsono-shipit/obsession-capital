@@ -4,8 +4,6 @@ import { Terminal, Shield, Mail, Briefcase, User, Sparkles, Database, CheckCircl
 interface Operator {
   name: string;
   hustle: string;
-  email: string;
-  date: string;
   status: "ACTIVE" | "STANDBY" | "INITIALIZING";
 }
 
@@ -16,10 +14,10 @@ interface AsciiLandingProps {
 }
 
 const DEFAULT_OPERATORS: Operator[] = [
-  { name: "Root Operator", hustle: "SEO Audit Micro-Agency", email: "root@obsession.os", date: "2026-06-15", status: "ACTIVE" },
-  { name: "cyber_hustler", hustle: "Niche Substack Curation", email: "hustle@net.io", date: "2026-06-20", status: "ACTIVE" },
-  { name: "quantum_coder", hustle: "API SaaS Boilerplates", email: "qc@coder.sh", date: "2026-06-24", status: "STANDBY" },
-  { name: "zen_negotiator", hustle: "Enterprise Raise Coaching", email: "zen@negotiate.net", date: "2026-06-28", status: "ACTIVE" },
+  { name: "Root Operator", hustle: "SEO Audit Micro-Agency", status: "ACTIVE" },
+  { name: "cyber_hustler", hustle: "Niche Substack Curation", status: "ACTIVE" },
+  { name: "quantum_coder", hustle: "API SaaS Boilerplates", status: "STANDBY" },
+  { name: "zen_negotiator", hustle: "Enterprise Raise Coaching", status: "ACTIVE" },
 ];
 
 export default function AsciiLanding({ onActivate, currentProfile, onClose }: AsciiLandingProps) {
@@ -36,19 +34,18 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
   const [bootLogs, setBootLogs] = useState<string[]>([]);
   const [currentLogIdx, setCurrentLogIdx] = useState(0);
 
-  // Load and seed operators
+  // Load live operators from Supabase
   useEffect(() => {
-    const stored = localStorage.getItem("registered_operators");
-    if (stored) {
-      try {
-        setOperators(JSON.parse(stored));
-      } catch (e) {
-        setOperators(DEFAULT_OPERATORS);
-      }
-    } else {
-      localStorage.setItem("registered_operators", JSON.stringify(DEFAULT_OPERATORS));
-      setOperators(DEFAULT_OPERATORS);
-    }
+    fetch("/api/operators")
+      .then(r => r.json())
+      .then((data: Operator[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setOperators(data);
+        } else {
+          setOperators(DEFAULT_OPERATORS);
+        }
+      })
+      .catch(() => setOperators(DEFAULT_OPERATORS));
   }, []);
 
   // Boot sequence logs to print on successful sign-up
@@ -105,19 +102,6 @@ export default function AsciiLanding({ onActivate, currentProfile, onClose }: As
       setError("SECURE TRANSMISSION CHANNEL (VALID EMAIL) REQUIRED.");
       return;
     }
-
-    // Save operator to distributed ledger (localStorage)
-    const newOp: Operator = {
-      name: name.trim(),
-      hustle: hustle.trim(),
-      email: email.trim(),
-      date: new Date().toISOString().split("T")[0],
-      status: "ACTIVE"
-    };
-
-    const updatedOperators = [newOp, ...operators.filter((o) => o.email !== newOp.email)];
-    localStorage.setItem("registered_operators", JSON.stringify(updatedOperators));
-    setOperators(updatedOperators);
 
     // Start boot sequence animation
     setIsBooting(true);

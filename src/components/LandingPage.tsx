@@ -50,7 +50,7 @@ export default function LandingPage() {
           >
             OBSESSION OS
           </h1>
-          <p className="mt-4 text-white/70 text-base font-light tracking-wide mx-auto"
+          <p className="mt-4 inline-block bg-black text-white text-base font-light tracking-wide px-3 py-1"
             style={{ fontFamily: "'Georgia', serif", whiteSpace: "nowrap" }}>
             The Operating System built for those obsessed with winning
           </p>

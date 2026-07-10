@@ -665,10 +665,30 @@ if (!process.env.VERCEL) {
 // API: Get today's 5 daily ideas
 // ----------------------------------------------------
 app.get("/api/daily-ideas", async (req, res) => {
+  // 1. Try today's Supabase cache
   const cache = await loadDailyCache();
   if (cache && Array.isArray(cache.ideas) && cache.ideas.length > 0) {
     return res.json({ date: todayStr(), ideas: cache.ideas, fresh: true });
   }
+
+  // No data for today — fire a background scrape on local dev so next reload has fresh data
+  if (!process.env.VERCEL) {
+    runDailyScrape().catch(e => console.error("[Auto-scrape]", e));
+  }
+
+  // 2. Try most recent scraped data from last 7 days
+  const { data: recent } = await supabase
+    .from("daily_ideas")
+    .select("ideas, date")
+    .order("date", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (recent && Array.isArray(recent.ideas) && recent.ideas.length > 0) {
+    return res.json({ date: recent.date as string, ideas: recent.ideas, fresh: false });
+  }
+
+  // 3. No Supabase data at all — return hardcoded fallback
   return res.json({ date: todayStr(), ideas: CODEX_PLAYBOOKS.slice(0, 5), fresh: false });
 });
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { RefreshCw, LogOut, User } from "lucide-react";
-import { MetricConfig, DailyLog, ForgeIdea, PodMember, CodexPlaybook } from "../types";
+import { MetricConfig, DailyLog, ForgeIdea, CodexPlaybook } from "../types";
 import Heatmap from "../components/Heatmap";
 import ForgeSection from "../components/ForgeSection";
 import SwipeCards3 from "./SwipeCards3";
@@ -12,12 +12,6 @@ const DEFAULT_METRIC: MetricConfig = { name: "Side Hustle Revenue", unit: "USD",
 
 const TODAY = new Date().toISOString().split("T")[0];
 
-const POD_MEMBERS: PodMember[] = [
-  { name: "You", role: "Audits & Speed Opt", streak: 8, commitment: "15 audits shipped", heatmapSeed: [4, 3, 4, 0, 4, 3, 4] },
-  { name: "cyber_hustler", role: "Niche Substack", streak: 12, commitment: "1 newsletter published", heatmapSeed: [2, 3, 2, 4, 3, 0, 2] },
-  { name: "quantum_coder", role: "API SaaS", streak: 5, commitment: "Send 20 cold pitches", heatmapSeed: [0, 4, 0, 4, 0, 4, 2] },
-  { name: "zen_negotiator", role: "Enterprise Sales", streak: 3, commitment: "Draft 2 proposals", heatmapSeed: [3, 0, 3, 0, 3, 2, 3] },
-];
 
 type Tab = "scoreboard" | "ideas" | "forge" | "pod";
 
@@ -78,8 +72,21 @@ export default function Win3App() {
     return new Array(count).fill(false);
   });
 
+  const [podMembers, setPodMembers] = useState<any[]>([]);
+  const [podLoading, setPodLoading] = useState(false);
+
   useEffect(() => { localStorage.setItem("obsession_logs", JSON.stringify(logs)); }, [logs]);
   useEffect(() => { localStorage.setItem("w3_ideas", JSON.stringify(ideas)); }, [ideas]);
+
+  useEffect(() => {
+    if (tab !== "pod" || !profile) return;
+    setPodLoading(true);
+    fetch(`/api/pod-members?email=${encodeURIComponent(profile.email)}`)
+      .then(r => r.json())
+      .then(data => setPodMembers(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setPodLoading(false));
+  }, [tab, profile]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -736,33 +743,43 @@ export default function Win3App() {
 
             <div className="relative border border-[#333] bg-[#0a0a0a]">
               <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
-                ALPHA_EARNERS · {POD_MEMBERS.length} builders
+                ALPHA_EARNERS · {podLoading ? "…" : `${podMembers.length} builders`}
               </div>
               <div className="divide-y divide-[#1a1a1a] mt-1">
-                {POD_MEMBERS.map((member, idx) => {
-                  const isMe = idx === 0;
+                {podLoading && (
+                  <div className="flex items-center justify-center py-10 gap-3">
+                    <span className="w-4 h-4 border-2 border-[#333] border-t-emerald-400 rounded-full animate-spin" />
+                    <span className="text-[10px] font-mono text-[#555] uppercase tracking-widest">Loading pod...</span>
+                  </div>
+                )}
+                {!podLoading && podMembers.length === 0 && (
+                  <div className="py-10 text-center text-[10px] font-mono text-[#444] uppercase tracking-widest">
+                    No operators yet. Be the first.
+                  </div>
+                )}
+                {!podLoading && podMembers.map((member) => {
                   const barColors = ["bg-neutral-900", "bg-emerald-900", "bg-emerald-700", "bg-emerald-500", "bg-emerald-400"];
                   return (
-                    <div key={member.name} className={`p-4 flex items-center justify-between gap-4 ${isMe ? "bg-neutral-900/30" : ""}`}>
+                    <div key={member.name} className={`p-4 flex items-center justify-between gap-4 ${member.isMe ? "bg-neutral-900/30" : ""}`}>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="text-white font-bold text-xs">{member.name}</span>
                           <span className="text-[8px] bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 text-neutral-500 uppercase font-mono">
                             {member.role}
                           </span>
-                          {isMe && (
+                          {member.isMe && (
                             <span className="text-[8px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 font-mono uppercase font-bold">
                               You
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-neutral-500 truncate">"{isMe ? commitment : member.commitment}"</div>
+                        <div className="text-[10px] text-neutral-500 truncate">"{member.isMe ? commitment : member.commitment}"</div>
                       </div>
                       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                         <span className="text-[10px] font-mono text-emerald-400">{member.streak}D streak</span>
                         <div className="flex gap-1">
-                          {member.heatmapSeed.map((v, i) => (
-                            <div key={i} className={`w-3 h-3 ${barColors[v]}`} />
+                          {member.heatmapSeed.map((v: number, i: number) => (
+                            <div key={i} className={`w-3 h-3 ${barColors[v] ?? "bg-neutral-900"}`} />
                           ))}
                         </div>
                       </div>

@@ -553,6 +553,72 @@ app.get("/api/operators", async (req, res) => {
 });
 
 // ----------------------------------------------------
+// API: Pod members — live data from profiles + mission + task_checks
+// ----------------------------------------------------
+app.get("/api/pod-members", async (req, res) => {
+  const { email: currentEmail } = req.query as { email?: string };
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("email, name, hustle")
+    .order("updated_at", { ascending: false })
+    .limit(20);
+
+  if (!profiles || profiles.length === 0) return res.json([]);
+
+  const emails = profiles.map((p: any) => p.email as string);
+
+  const [{ data: missions }, { data: checks }] = await Promise.all([
+    supabase.from("mission").select("email, goal").in("email", emails),
+    supabase.from("task_checks").select("email, date, checks").in("email", emails).gte("date", thirtyDaysAgo),
+  ]);
+
+  const missionMap = new Map((missions || []).map((m: any) => [m.email as string, m.goal as string]));
+
+  // email → date → heatmap value 0..4
+  const heatMap = new Map<string, Map<string, number>>();
+  for (const c of (checks || [])) {
+    if (!heatMap.has(c.email)) heatMap.set(c.email, new Map());
+    const arr: boolean[] = Array.isArray(c.checks) ? c.checks : [];
+    const val = arr.length === 0 ? 0 : Math.round((arr.filter(Boolean).length / arr.length) * 4);
+    heatMap.get(c.email)!.set(c.date as string, val);
+  }
+
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
+
+  const computeStreak = (emailAddr: string) => {
+    let s = 0;
+    for (let i = 0; i < 30; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ds = d.toISOString().split("T")[0];
+      if ((heatMap.get(emailAddr)?.get(ds) ?? 0) > 0) s++;
+      else if (i > 0) break;
+    }
+    return s;
+  };
+
+  const members = profiles.map((p: any) => ({
+    name: p.name || "Operator",
+    role: p.hustle || "—",
+    commitment: (missionMap.get(p.email) || "No goal set").slice(0, 120),
+    streak: computeStreak(p.email),
+    heatmapSeed: last7.map(d => heatMap.get(p.email)?.get(d) ?? 0),
+    isMe: p.email === currentEmail,
+  }));
+
+  members.sort((a: any, b: any) => Number(b.isMe) - Number(a.isMe) || b.streak - a.streak);
+
+  res.json(members);
+});
+
+// ----------------------------------------------------
 // Newsletter signups → Supabase `newsletter` table
 // ----------------------------------------------------
 app.post("/api/newsletter", async (req, res) => {

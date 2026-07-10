@@ -27,14 +27,7 @@ export default function LandingPage() {
           </svg>
           <span className="text-sm font-semibold tracking-widest uppercase">Obsession OS</span>
         </div>
-        <div className="hidden md:flex items-center gap-10">
-          {["Features", "For F&B", "About", "Contact"].map(l => (
-            <a key={l} href="#" className="text-xs font-semibold tracking-widest uppercase text-white/70 hover:text-white transition-colors">
-              {l}
-            </a>
-          ))}
-        </div>
-        <a href="/win" className="border border-white text-white text-xs font-bold tracking-widest uppercase px-5 py-2.5 hover:bg-white hover:text-black transition-all">
+        <a href="/win" className="border border-white text-white text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 hover:bg-white hover:text-black transition-all">
           Enter
         </a>
       </nav>

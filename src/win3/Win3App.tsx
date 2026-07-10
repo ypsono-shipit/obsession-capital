@@ -74,6 +74,36 @@ export default function Win3App() {
   useEffect(() => { localStorage.setItem("obsession_logs", JSON.stringify(logs)); }, [logs]);
   useEffect(() => { localStorage.setItem("w3_ideas", JSON.stringify(ideas)); }, [ideas]);
 
+  // Load all user data from Supabase when profile is known
+  useEffect(() => {
+    if (!profile) return;
+    const email = encodeURIComponent(profile.email);
+    Promise.all([
+      fetch(`/api/ideas?email=${email}`).then(r => r.json()),
+      fetch(`/api/logs?email=${email}`).then(r => r.json()),
+      fetch(`/api/mission?email=${email}`).then(r => r.json()),
+      fetch(`/api/task-checks?email=${email}&date=${TODAY}`).then(r => r.json()),
+    ]).then(([remoteIdeas, remoteLogs, mission, checksData]) => {
+      if (Array.isArray(remoteIdeas) && remoteIdeas.length > 0) {
+        const mapped = remoteIdeas.map((i: any) => ({
+          id: i.id, title: i.title, category: i.category,
+          description: i.description, metricsGoals: i.metrics_goals,
+          critique: i.critique, assumption: i.assumption, experiments: i.experiments,
+          status: i.status, createdAt: i.created_at,
+        }));
+        setIdeas(mapped);
+      }
+      if (Array.isArray(remoteLogs) && remoteLogs.length > 0) setLogs(remoteLogs);
+      if (mission?.goal) {
+        setActiveGoal(mission.goal);
+        setActiveTasks(mission.tasks || []);
+        localStorage.setItem("w3_goal", mission.goal);
+        localStorage.setItem("w3_task_list", JSON.stringify(mission.tasks || []));
+      }
+      if (checksData?.checks) setTaskChecks(checksData.checks);
+    }).catch(e => console.error("[DB] Load failed, using localStorage cache:", e));
+  }, [profile?.email]);
+
   const fetchInsight = async () => {
     if (logs.length === 0) return;
     setLoadingInsight(true);
@@ -102,6 +132,13 @@ export default function Win3App() {
       }
       return [...prev, { date, value, note }].sort((a, b) => b.date.localeCompare(a.date));
     });
+    if (profile) {
+      fetch("/api/logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, date, value, note }),
+      }).catch(console.error);
+    }
   };
 
   const handleBulkUpdateLogs = (newLogs: DailyLog[]) => setLogs(newLogs);
@@ -127,6 +164,11 @@ export default function Win3App() {
           ? { ...i, critique: data.critique, assumption: data.assumption, experiments: data.experiments, status: "Validation Active" }
           : i
         ));
+        fetch(`/api/ideas/${ideaId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ critique: data.critique, assumption: data.assumption, experiments: data.experiments, status: "Validation Active" }),
+        }).catch(console.error);
       }
     } catch (e) { console.error(e); }
   };
@@ -151,6 +193,13 @@ export default function Win3App() {
 
     setIdeas(prev => [newIdea, ...prev]);
     setWizardIdeaId(newIdea.id);
+    if (profile) {
+      fetch("/api/ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newIdea, email: profile.email }),
+      }).catch(console.error);
+    }
     fetchCritique(newIdea.id, newIdea.title, newIdea.category, description, "");
   };
 
@@ -174,6 +223,13 @@ export default function Win3App() {
 
     setIdeas(prev => [newIdea, ...prev]);
     setWizardIdeaId(newIdea.id);
+    if (profile) {
+      fetch("/api/ideas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newIdea, email: profile.email }),
+      }).catch(console.error);
+    }
     fetchCritique(newIdea.id, newIdea.title, newIdea.category, description, playbook.metrics);
   };
 
@@ -187,6 +243,13 @@ export default function Win3App() {
     localStorage.setItem(`w3_checks_${TODAY}`, JSON.stringify(checks));
     setWizardIdeaId(null);
     setTab("scoreboard");
+    if (profile) {
+      fetch("/api/mission", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: profile.email, goal, tasks }),
+      }).catch(console.error);
+    }
   };
 
   const toggleTask = (i: number) => {
@@ -194,6 +257,13 @@ export default function Win3App() {
       const next = [...prev];
       next[i] = !next[i];
       localStorage.setItem(`w3_checks_${TODAY}`, JSON.stringify(next));
+      if (profile) {
+        fetch("/api/task-checks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: profile.email, date: TODAY, checks: next }),
+        }).catch(console.error);
+      }
       return next;
     });
   };
@@ -223,6 +293,11 @@ export default function Win3App() {
           localStorage.setItem("w3_email", p.email);
           setProfile(p);
           setShowLanding(false);
+          fetch("/api/profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(p),
+          }).catch(console.error);
         }}
         currentProfile={profile}
         onClose={profile ? () => setShowLanding(false) : undefined}

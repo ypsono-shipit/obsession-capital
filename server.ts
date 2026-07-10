@@ -1,11 +1,16 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import cron from "node-cron";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 const app = express();
 app.use(express.json());
@@ -396,33 +401,130 @@ Return a clean JSON object in this format:
 });
 
 // ----------------------------------------------------
-// Daily Ideas Cache (Reddit Scraper)
+// User Data CRUD Endpoints
 // ----------------------------------------------------
 
-const DAILY_IDEAS_PATH = path.join(process.cwd(), "daily-ideas.json");
+// Profile upsert
+app.post("/api/profile", async (req, res) => {
+  const { email, name, hustle } = req.body;
+  if (!email) return res.status(400).json({ error: "email required" });
+  const { error } = await supabase.from("profiles").upsert({ email, name, hustle, updated_at: new Date().toISOString() });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
 
-interface DailyIdeasCache {
-  date: string; // YYYY-MM-DD
-  ideas: typeof CODEX_PLAYBOOKS;
-}
+// Ideas
+app.get("/api/ideas", async (req, res) => {
+  const { email } = req.query as { email: string };
+  if (!email) return res.status(400).json({ error: "email required" });
+  const { data, error } = await supabase.from("ideas").select("*").eq("email", email).order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+app.post("/api/ideas", async (req, res) => {
+  const idea = req.body;
+  if (!idea?.id || !idea?.email) return res.status(400).json({ error: "id and email required" });
+  const { error } = await supabase.from("ideas").upsert({
+    id: idea.id, email: idea.email, title: idea.title, category: idea.category,
+    description: idea.description, metrics_goals: idea.metricsGoals || "",
+    critique: idea.critique, assumption: idea.assumption, experiments: idea.experiments,
+    status: idea.status, updated_at: new Date().toISOString(),
+  });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+app.patch("/api/ideas/:id", async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (updates.critique !== undefined) dbUpdates.critique = updates.critique;
+  if (updates.assumption !== undefined) dbUpdates.assumption = updates.assumption;
+  if (updates.experiments !== undefined) dbUpdates.experiments = updates.experiments;
+  if (updates.status !== undefined) dbUpdates.status = updates.status;
+  if (updates.title !== undefined) dbUpdates.title = updates.title;
+  if (updates.description !== undefined) dbUpdates.description = updates.description;
+  if (updates.metricsGoals !== undefined) dbUpdates.metrics_goals = updates.metricsGoals;
+  const { error } = await supabase.from("ideas").update(dbUpdates).eq("id", id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+app.delete("/api/ideas/:id", async (req, res) => {
+  const { error } = await supabase.from("ideas").delete().eq("id", req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Daily logs
+app.get("/api/logs", async (req, res) => {
+  const { email } = req.query as { email: string };
+  if (!email) return res.status(400).json({ error: "email required" });
+  const { data, error } = await supabase.from("daily_logs").select("date,value,note").eq("email", email).order("date", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+app.post("/api/logs", async (req, res) => {
+  const { email, date, value, note } = req.body;
+  if (!email || !date) return res.status(400).json({ error: "email and date required" });
+  const { error } = await supabase.from("daily_logs").upsert({ email, date, value: Number(value) || 0, note: note || "" }, { onConflict: "email,date" });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// Mission (goal + tasks)
+app.get("/api/mission", async (req, res) => {
+  const { email } = req.query as { email: string };
+  if (!email) return res.status(400).json({ error: "email required" });
+  const { data, error } = await supabase.from("missions").select("*").eq("email", email).order("created_at", { ascending: false }).limit(1).single();
+  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
+  res.json(data || {});
+});
+
+app.post("/api/mission", async (req, res) => {
+  const { email, goal, tasks } = req.body;
+  if (!email || !goal) return res.status(400).json({ error: "email and goal required" });
+  // Delete old missions and insert fresh
+  await supabase.from("missions").delete().eq("email", email);
+  const { data, error } = await supabase.from("missions").insert({ email, goal, tasks: tasks || [] }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// Task checks (per user per day)
+app.get("/api/task-checks", async (req, res) => {
+  const { email, date } = req.query as { email: string; date: string };
+  if (!email || !date) return res.status(400).json({ error: "email and date required" });
+  const { data, error } = await supabase.from("task_checks").select("checks").eq("email", email).eq("date", date).single();
+  if (error && error.code !== "PGRST116") return res.status(500).json({ error: error.message });
+  res.json(data || { checks: [] });
+});
+
+app.post("/api/task-checks", async (req, res) => {
+  const { email, date, checks } = req.body;
+  if (!email || !date) return res.status(400).json({ error: "email and date required" });
+  const { error } = await supabase.from("task_checks").upsert({ email, date, checks: checks || [] }, { onConflict: "email,date" });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// ----------------------------------------------------
+// Daily Ideas Cache (Reddit Scraper — Supabase backed)
+// ----------------------------------------------------
 
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
-function loadDailyCache(): DailyIdeasCache | null {
-  try {
-    if (!fs.existsSync(DAILY_IDEAS_PATH)) return null;
-    const raw = fs.readFileSync(DAILY_IDEAS_PATH, "utf-8");
-    return JSON.parse(raw) as DailyIdeasCache;
-  } catch {
-    return null;
-  }
+async function loadDailyCache() {
+  const { data } = await supabase.from("daily_ideas").select("ideas, date").eq("date", todayStr()).single();
+  return data ?? null;
 }
 
-function saveDailyCache(ideas: typeof CODEX_PLAYBOOKS) {
-  const cache: DailyIdeasCache = { date: todayStr(), ideas };
-  fs.writeFileSync(DAILY_IDEAS_PATH, JSON.stringify(cache, null, 2), "utf-8");
+async function saveDailyCache(ideas: typeof CODEX_PLAYBOOKS) {
+  await supabase.from("daily_ideas").upsert({ date: todayStr(), ideas, scraped_at: new Date().toISOString() });
 }
 
 const SUBREDDITS = ["Entrepreneur", "sidehustle", "smallbusiness"];
@@ -523,12 +625,13 @@ async function runDailyScrape() {
 }
 
 // Run once on startup if cache is stale or missing
-const cached = loadDailyCache();
-if (!cached || cached.date !== todayStr()) {
-  runDailyScrape().catch(e => console.error("[Scraper] Startup scrape failed:", e));
-} else {
-  console.log(`[Scraper] Cache fresh for ${todayStr()}, skipping startup scrape`);
-}
+loadDailyCache().then(cached => {
+  if (!cached) {
+    runDailyScrape().catch(e => console.error("[Scraper] Startup scrape failed:", e));
+  } else {
+    console.log(`[Scraper] Cache fresh for ${todayStr()}, skipping startup scrape`);
+  }
+});
 
 // Cron: every day at 6:00 AM server time
 cron.schedule("0 6 * * *", () => {
@@ -539,12 +642,11 @@ cron.schedule("0 6 * * *", () => {
 // ----------------------------------------------------
 // API: Get today's 5 daily ideas
 // ----------------------------------------------------
-app.get("/api/daily-ideas", (req, res) => {
-  const cache = loadDailyCache();
-  if (cache && cache.date === todayStr() && cache.ideas.length > 0) {
-    return res.json({ date: cache.date, ideas: cache.ideas, fresh: true });
+app.get("/api/daily-ideas", async (req, res) => {
+  const cache = await loadDailyCache();
+  if (cache && Array.isArray(cache.ideas) && cache.ideas.length > 0) {
+    return res.json({ date: todayStr(), ideas: cache.ideas, fresh: true });
   }
-  // Fallback to static playbooks if scrape hasn't run yet
   return res.json({ date: todayStr(), ideas: CODEX_PLAYBOOKS.slice(0, 5), fresh: false });
 });
 

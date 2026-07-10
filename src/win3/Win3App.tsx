@@ -703,6 +703,23 @@ export default function Win3App() {
         {tab === "pod" && (
           <div className="space-y-6 max-w-5xl mx-auto">
 
+            {/* Telegram CTA */}
+            <a
+              href="https://t.me/+RYTtE7O_g1VjNzNl"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] hover:border-neutral-600 transition px-4 py-3 group"
+            >
+              <div className="flex items-center gap-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#3b82f6" className="flex-shrink-0"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L8.32 13.617l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.828.942z"/></svg>
+                <div>
+                  <div className="text-[10px] font-mono text-white uppercase tracking-widest">Join the community on Telegram</div>
+                  <div className="text-[9px] font-mono text-[#555] mt-0.5">Daily check-ins, wins, and accountability with other operators</div>
+                </div>
+              </div>
+              <span className="text-[9px] font-mono text-[#444] uppercase tracking-widest group-hover:text-white transition">Join →</span>
+            </a>
+
             <div className="relative border border-[#333] p-5 bg-[#0a0a0a]">
               <div className="absolute top-[-8px] left-[10px] bg-[#070707] px-1 text-[10px] text-emerald-400 tracking-widest uppercase font-bold">
                 My Commitment

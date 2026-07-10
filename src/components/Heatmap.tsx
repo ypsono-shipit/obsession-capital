@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { DailyLog, MetricConfig } from "../types";
 import { Plus, Edit2, Check, TrendingUp, Calendar, Info, Activity, ArrowUpRight, ArrowDownRight, Share2, Upload } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -11,35 +11,31 @@ interface HeatmapProps {
 }
 
 export default function Heatmap({ logs, metric, onSaveLog, onBulkUpdateLogs }: HeatmapProps) {
-  // Generate relative past days ending on mock system date 2026-06-25
+  const TODAY_STR = new Date().toISOString().split("T")[0];
+
   const generatePastDays = (count: number) => {
-    const today = new Date("2026-06-25");
+    const today = new Date();
     const days = [];
     for (let i = count - 1; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateString = d.toISOString().split("T")[0];
-      days.push(dateString);
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+      days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
     }
     return days;
   };
 
-  // Generate the full year of 2026 starting from December 28, 2025 (preceding Sunday) to January 2, 2027 (succeeding Saturday)
-  const generate2026CalendarDays = () => {
+  const generateCalendarDays = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const jan1DayOfWeek = new Date(year, 0, 1).getDay();
     const days = [];
-    // Start date is Sunday, Dec 28, 2025 to align 53 weeks (371 days)
-    const start = new Date("2025-12-28T00:00:00");
     for (let i = 0; i < 371; i++) {
-      const d = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      days.push(`${year}-${month}-${day}`);
+      const d = new Date(year, 0, 1 - jan1DayOfWeek + i);
+      days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
     }
     return days;
   };
 
-  const past371Days = generate2026CalendarDays();
+  const past371Days = generateCalendarDays();
 
   // Group into 53 weeks of 7 days
   const weeks: string[][] = [];
@@ -66,8 +62,20 @@ export default function Heatmap({ logs, metric, onSaveLog, onBulkUpdateLogs }: H
     return "bg-emerald-500 border-emerald-400 text-neutral-950 font-bold hover:border-white";
   };
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const cell = document.getElementById(`cell-${TODAY_STR}`);
+    if (!cell) return;
+    const containerRect = container.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+    container.scrollLeft += cellRect.left - containerRect.left - container.clientWidth * 0.7 + cellRect.width / 2;
+  }, []);
+
   // State for selected date in the heatmap
-  const [selectedDate, setSelectedDate] = useState<string>("2026-06-25");
+  const [selectedDate, setSelectedDate] = useState<string>(TODAY_STR);
   const [logValue, setLogValue] = useState<string>("");
   const [logNote, setLogNote] = useState<string>("");
   const [isEditing, setIsEditing] = useState(false);
@@ -641,7 +649,7 @@ export default function Heatmap({ logs, metric, onSaveLog, onBulkUpdateLogs }: H
         </div>
 
         {/* The Heatmap Grid */}
-        <div className="overflow-x-auto pb-4 scrollbar-thin">
+        <div ref={scrollContainerRef} className="overflow-x-auto pb-4 scrollbar-thin">
           <div className="min-w-[620px]">
             {/* Months Header row */}
             <div className="relative h-5 mb-1 pl-10 text-[9px] font-mono text-neutral-500 select-none">

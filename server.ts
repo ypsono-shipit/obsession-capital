@@ -4,7 +4,6 @@ import path from "path";
 import dotenv from "dotenv";
 import { timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
-import { BUILTIN_RESOURCES, SLUG_RE, isBuiltinSlug } from "./src/win3/builtinResources.ts";
 
 dotenv.config();
 
@@ -750,6 +749,26 @@ app.get("/api/daily-ideas", (_req, res) => {
 // ----------------------------------------------------
 // Resource library — built-in guide plus /admin uploads
 // ----------------------------------------------------
+
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const BUILTIN_RESOURCES = [
+  {
+    slug: "compounding-second-brain",
+    title: "Compounding Second Brain: Claude Code + Obsidian",
+    category: "Productivity",
+    summary:
+      "Turn your daily notes into a growing, intelligent knowledge base that actively finds connections and compounds over time.",
+    read_minutes: 20,
+    level: "Starter",
+    status: "published" as const,
+    source: "builtin" as const,
+  },
+];
+
+function isBuiltinSlug(slug: string): boolean {
+  return BUILTIN_RESOURCES.some((resource) => resource.slug === slug);
+}
 
 const MISSING_RESOURCES_TABLE =
   "The resources table is missing. Run the resources section of supabase/schema.sql in the Supabase SQL editor, then try again.";

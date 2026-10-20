@@ -66,3 +66,19 @@ create table if not exists daily_ideas (
   ideas jsonb not null default '[]',
   scraped_at timestamptz default now()
 );
+
+-- Playbooks uploaded from /admin. The server writes these with the service role.
+-- Row level security stays on with no policies, so the anon key cannot read or write them.
+create table if not exists resources (
+  slug text primary key,
+  title text not null,
+  category text not null default 'General',
+  summary text not null default '',
+  read_minutes integer not null default 10,
+  level text not null default 'Starter',
+  body text not null default '',
+  status text not null default 'draft' check (status in ('draft', 'published')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table resources enable row level security;

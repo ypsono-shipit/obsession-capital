@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { LogOut, User, ArrowRight, Lock } from "lucide-react";
+import { BUILTIN_RESOURCES, ResourceSummary } from "./builtinResources.ts";
 
 const COMING_SOON = [
   { category: "Revenue", title: "The $0 Customer Acquisition Stack" },
@@ -17,7 +18,22 @@ export default function ResourceApp() {
     return name && hustle && email ? { name, hustle, email } : null;
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [resources, setResources] = useState<ResourceSummary[]>(BUILTIN_RESOURCES);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/resources")
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !Array.isArray(data.resources) || data.resources.length === 0) return;
+        setResources(data.resources.filter((item: ResourceSummary) => !item.status || item.status === "published"));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -91,43 +107,45 @@ export default function ResourceApp() {
         <div className="mb-8">
           <div className="text-[9px] font-mono text-[#444] uppercase tracking-widest mb-2">Resource Library</div>
           <h1 className="text-white font-mono text-xl font-light">Playbooks & Frameworks</h1>
-          <p className="text-neutral-600 font-mono text-[10px] mt-1">1 live · 5 coming soon</p>
+          <p className="text-neutral-600 font-mono text-[10px] mt-1">{resources.length} live · {COMING_SOON.length} coming soon</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          {/* ── Live card ── */}
-          <a
-            href="/resource/compounding-second-brain"
-            className="group border border-[#333] bg-[#0a0a0a] hover:border-neutral-500 transition text-left flex flex-col h-[220px]"
-          >
-            <div className="border-b border-[#1a1a1a] px-4 py-3 flex items-center justify-between">
-              <span className="text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border text-white/70 bg-white/5 border-white/10">
-                Productivity
-              </span>
-              <span className="text-[9px] font-mono text-[#444]">20 min read</span>
-            </div>
-            <div className="flex-1 px-4 py-4 flex flex-col justify-between">
-              <div>
-                <h3 className="text-white font-mono text-sm font-light leading-snug mb-2">
-                  Compounding Second Brain:<br />Claude Code + Obsidian
-                </h3>
-                <p className="text-neutral-600 font-mono text-[10px] leading-relaxed line-clamp-2">
-                  Turn your daily notes into a growing, intelligent knowledge base that actively finds connections and compounds over time.
-                </p>
-              </div>
-              <div className="flex items-center justify-between mt-3">
-                <div className="flex gap-1.5">
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="w-1.5 h-1.5 bg-[#444] group-hover:bg-neutral-500 transition" />
-                  ))}
-                </div>
-                <span className="text-[9px] font-mono text-neutral-500 group-hover:text-white transition uppercase tracking-widest flex items-center gap-1">
-                  Read <ArrowRight className="w-3 h-3" />
+          {resources.map((item) => (
+            <a
+              key={item.slug}
+              href={`/resource/${item.slug}`}
+              className="group border border-[#333] bg-[#0a0a0a] hover:border-neutral-500 transition text-left flex flex-col h-[220px]"
+            >
+              <div className="border-b border-[#1a1a1a] px-4 py-3 flex items-center justify-between">
+                <span className="text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border text-white/70 bg-white/5 border-white/10">
+                  {item.category}
                 </span>
+                <span className="text-[9px] font-mono text-[#444]">{item.read_minutes} min read</span>
               </div>
-            </div>
-          </a>
+              <div className="flex-1 px-4 py-4 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-white font-mono text-sm font-light leading-snug mb-2 line-clamp-3">
+                    {item.title}
+                  </h3>
+                  <p className="text-neutral-600 font-mono text-[10px] leading-relaxed line-clamp-2">
+                    {item.summary}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="w-1.5 h-1.5 bg-[#444] group-hover:bg-neutral-500 transition" />
+                    ))}
+                  </div>
+                  <span className="text-[9px] font-mono text-neutral-500 group-hover:text-white transition uppercase tracking-widest flex items-center gap-1">
+                    Read <ArrowRight className="w-3 h-3" />
+                  </span>
+                </div>
+              </div>
+            </a>
+          ))}
 
           {/* ── Coming soon cards ── */}
           {COMING_SOON.map((item, i) => (

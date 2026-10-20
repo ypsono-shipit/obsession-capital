@@ -1,7 +1,10 @@
 import express from "express";
+import type { Request, Response } from "express";
 import path from "path";
 import dotenv from "dotenv";
+import { timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { BUILTIN_RESOURCES, SLUG_RE, isBuiltinSlug } from "./src/win3/builtinResources.ts";
 
 dotenv.config();
 
@@ -11,7 +14,7 @@ const supabase = createClient(
 );
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 const PORT = 3000;
 
@@ -742,6 +745,240 @@ const DAILY_IDEAS = [
 // ----------------------------------------------------
 app.get("/api/daily-ideas", (_req, res) => {
   res.json({ ideas: DAILY_IDEAS, fresh: true });
+});
+
+// ----------------------------------------------------
+// Resource library — built-in guide plus /admin uploads
+// ----------------------------------------------------
+
+const MISSING_RESOURCES_TABLE =
+  "The resources table is missing. Run the resources section of supabase/schema.sql in the Supabase SQL editor, then try again.";
+
+function isMissingResourcesTable(error: { code?: string; message?: string }) {
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+  const msg = (error.message || "").toLowerCase();
+  return msg.includes("resources") && (msg.includes("does not exist") || msg.includes("schema cache") || msg.includes("could not find"));
+}
+
+function adminConfigured(): boolean {
+  return Boolean(process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.trim());
+}
+
+function adminAuthorized(req: Request): boolean {
+  const expected = (process.env.ADMIN_PASSWORD || "").trim();
+  const provided = (req.get("x-admin-key") || "").trim();
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length === 0 || a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function requireAdmin(req: Request, res: Response): boolean {
+  if (!adminConfigured()) {
+    res.status(503).json({ error: "ADMIN_PASSWORD is not set on the server." });
+    return false;
+  }
+  if (!adminAuthorized(req)) {
+    res.status(401).json({ error: "Wrong admin password." });
+    return false;
+  }
+  return true;
+}
+
+function mapUpload(row: any) {
+  return {
+    slug: row.slug,
+    title: row.title,
+    category: row.category,
+    summary: row.summary || "",
+    read_minutes: Number(row.read_minutes) || 10,
+    level: row.level || "Starter",
+    status: row.status === "published" ? "published" : "draft",
+    source: "upload" as const,
+    updated_at: row.updated_at || null,
+    body: row.body || "",
+  };
+}
+
+function dbMessage(error: { message?: string }) {
+  const msg = error.message || "Database error";
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|getaddrinfo/i.test(msg)) {
+    return "Could not reach Supabase. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.";
+  }
+  return msg;
+}
+
+function resourceDbError(res: Response, error: { code?: string; message?: string }) {
+  if (isMissingResourcesTable(error)) return res.status(503).json({ error: MISSING_RESOURCES_TABLE });
+  if (error.code === "23505") return res.status(409).json({ error: "A resource with that slug already exists." });
+  return res.status(500).json({ error: dbMessage(error) });
+}
+
+function cleanResourceInput(input: any) {
+  const title = String(input?.title || "").trim();
+  const slug = String(input?.slug || "").trim().toLowerCase();
+  const category = String(input?.category || "General").trim() || "General";
+  const level = String(input?.level || "Starter").trim() || "Starter";
+  let summary = String(input?.summary || "").trim();
+  const body = String(input?.body || "").replace(/\r\n/g, "\n");
+  const status = input?.status === "published" ? "published" : "draft";
+  const read = Number(input?.read_minutes);
+
+  if (!title || title.length > 160) return { error: "Title is required (160 characters max)." };
+  if (!SLUG_RE.test(slug) || slug.length > 80) return { error: "Slug must be lowercase letters, numbers, and hyphens." };
+  if (isBuiltinSlug(slug)) return { error: "That slug is reserved by a built-in guide." };
+  if (category.length > 40) return { error: "Category is too long." };
+  if (level.length > 40) return { error: "Level is too long." };
+  if (!body.trim()) return { error: "Body is required. Paste markdown or upload a .md file." };
+  if (body.length > 100_000) return { error: "Body is too long." };
+  if (!Number.isFinite(read) || read < 1 || read > 240) return { error: "Read time must be between 1 and 240 minutes." };
+
+  if (!summary) {
+    const line = body.split("\n").map((l) => l.trim()).find((l) => l && !l.startsWith("#") && !l.startsWith("```") && !l.startsWith("-") && !/^\d+\./.test(l));
+    summary = (line || title).slice(0, 280);
+  }
+  if (summary.length > 400) return { error: "Summary is too long (400 characters max)." };
+
+  return {
+    value: {
+      slug,
+      title,
+      category,
+      summary,
+      read_minutes: Math.round(read),
+      level,
+      body,
+      status,
+      updated_at: new Date().toISOString(),
+    },
+  };
+}
+
+app.get("/api/resources", async (_req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("resources")
+      .select("slug,title,category,summary,read_minutes,level,status,updated_at")
+      .eq("status", "published")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      console.warn("[resources] public list fell back to built-in guides:", error.message);
+      return res.json({ resources: BUILTIN_RESOURCES });
+    }
+    const uploads = (data || []).map((row) => {
+      const mapped = mapUpload(row);
+      const { body: _body, ...card } = mapped;
+      return card;
+    });
+    res.json({ resources: [...BUILTIN_RESOURCES, ...uploads] });
+  } catch {
+    res.json({ resources: BUILTIN_RESOURCES });
+  }
+});
+
+app.get("/api/resources/:slug", async (req, res) => {
+  const slug = String(req.params.slug || "");
+  if (isBuiltinSlug(slug)) {
+    const builtin = BUILTIN_RESOURCES.find((resource) => resource.slug === slug);
+    return res.json({ ...builtin, body: null });
+  }
+  if (!SLUG_RE.test(slug)) return res.status(404).json({ error: "Not found" });
+  try {
+    const { data, error } = await supabase.from("resources").select("*").eq("slug", slug).eq("status", "published").single();
+    if (error && error.code !== "PGRST116") {
+      if (isMissingResourcesTable(error)) return res.status(404).json({ error: "Not found" });
+      return res.status(500).json({ error: dbMessage(error) });
+    }
+    if (!data) return res.status(404).json({ error: "Not found" });
+    res.json(mapUpload(data));
+  } catch {
+    res.status(500).json({ error: "Could not reach Supabase. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." });
+  }
+});
+
+app.get("/api/admin/resources", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const { data, error } = await supabase
+      .from("resources")
+      .select("slug,title,category,summary,read_minutes,level,status,updated_at")
+      .order("updated_at", { ascending: false });
+    if (error) {
+      if (isMissingResourcesTable(error)) {
+        return res.json({ resources: BUILTIN_RESOURCES, warning: MISSING_RESOURCES_TABLE });
+      }
+      return res.status(500).json({ error: dbMessage(error) });
+    }
+    const uploads = (data || []).map((row) => {
+      const mapped = mapUpload(row);
+      const { body: _body, ...card } = mapped;
+      return card;
+    });
+    res.json({ resources: [...BUILTIN_RESOURCES, ...uploads] });
+  } catch {
+    res.status(500).json({ error: "Could not reach Supabase. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." });
+  }
+});
+
+app.get("/api/admin/resources/:slug", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const slug = String(req.params.slug || "");
+  if (isBuiltinSlug(slug)) return res.status(400).json({ error: "Built-in guides are not editable here." });
+  if (!SLUG_RE.test(slug)) return res.status(400).json({ error: "Invalid slug." });
+  try {
+    const { data, error } = await supabase.from("resources").select("*").eq("slug", slug).single();
+    if (error && error.code !== "PGRST116") return resourceDbError(res, error);
+    if (!data) return res.status(404).json({ error: "Not found" });
+    res.json(mapUpload(data));
+  } catch {
+    res.status(500).json({ error: "Could not reach Supabase." });
+  }
+});
+
+app.post("/api/admin/resources", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const cleaned = cleanResourceInput(req.body);
+  if (cleaned.error || !cleaned.value) return res.status(400).json({ error: cleaned.error });
+  try {
+    const { data, error } = await supabase.from("resources").insert(cleaned.value).select("*").single();
+    if (error) return resourceDbError(res, error);
+    res.status(201).json(mapUpload(data));
+  } catch {
+    res.status(500).json({ error: "Could not reach Supabase." });
+  }
+});
+
+app.put("/api/admin/resources/:slug", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const slug = String(req.params.slug || "");
+  if (isBuiltinSlug(slug)) return res.status(400).json({ error: "Built-in guides are not editable here." });
+  if (!SLUG_RE.test(slug)) return res.status(400).json({ error: "Invalid slug." });
+  const cleaned = cleanResourceInput({ ...req.body, slug });
+  if (cleaned.error || !cleaned.value) return res.status(400).json({ error: cleaned.error });
+  try {
+    const { data, error } = await supabase.from("resources").update(cleaned.value).eq("slug", slug).select("*").single();
+    if (error && error.code === "PGRST116") return res.status(404).json({ error: "Not found" });
+    if (error) return resourceDbError(res, error);
+    if (!data) return res.status(404).json({ error: "Not found" });
+    res.json(mapUpload(data));
+  } catch {
+    res.status(500).json({ error: "Could not reach Supabase." });
+  }
+});
+
+app.delete("/api/admin/resources/:slug", async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const slug = String(req.params.slug || "");
+  if (isBuiltinSlug(slug)) return res.status(400).json({ error: "Built-in guides cannot be deleted." });
+  if (!SLUG_RE.test(slug)) return res.status(400).json({ error: "Invalid slug." });
+  try {
+    const { data, error } = await supabase.from("resources").delete().eq("slug", slug).select("slug");
+    if (error) return resourceDbError(res, error);
+    if (!data || data.length === 0) return res.status(404).json({ error: "Not found" });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Could not reach Supabase." });
+  }
 });
 
 // ----------------------------------------------------
